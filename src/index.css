@@ -98,6 +98,11 @@ body {
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Helper Class for Inputs with Icons */
+.input-with-icon {
+  padding-left: 2.75rem !important;
+}
+
 /* Modern Card styling */
 .card-modern {
   background: var(--color-bg-surface);
@@ -149,7 +154,8 @@ body {
   textarea,
   select {
     font-size: 16px !important; /* Prevents auto-zoom on mobile iOS Safari / Chrome */
-    padding: 0.75rem 0.85rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
   }
 
   /* Stat cards & grid column stacking on mobile */
@@ -221,6 +227,17 @@ body {
 
   .app-header {
     padding: 0 0.75rem !important;
+  }
+
+  /* Login hero section responsiveness */
+  .login-left-hero {
+    display: none !important;
+  }
+
+  .admin-login-back-btn {
+    position: static !important;
+    margin-bottom: 1.25rem !important;
+    align-self: flex-start !important;
   }
 }
 
