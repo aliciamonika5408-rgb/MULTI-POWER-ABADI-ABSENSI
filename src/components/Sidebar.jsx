@@ -61,35 +61,36 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          height: "100vh",
+          height: "100dvh", /* Dynamic Viewport Height for Mobile Samsung & iPhone */
           position: "fixed",
           top: 0,
           left: 0,
           zIndex: 45,
           transition: "transform 0.3s ease",
           boxShadow: isOpen ? "4px 0 25px rgba(0,0,0,0.15)" : "none",
-          overflowY: "auto"
+          overflow: "hidden"
         }}
       >
-        <div>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
           {/* Brand Header */}
           <div
             style={{
-              height: "4.5rem",
+              height: "4rem",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "0 1.5rem",
-              borderBottom: "1px solid #e2e8f0"
+              padding: "0 1.25rem",
+              borderBottom: "1px solid #e2e8f0",
+              flexShrink: 0
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
               <div
                 style={{
-                  width: "2.5rem",
-                  height: "2.5rem",
+                  width: "2.25rem",
+                  height: "2.25rem",
                   backgroundColor: "#dc2626",
-                  borderRadius: "0.75rem",
+                  borderRadius: "0.65rem",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -97,13 +98,13 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
                   boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)"
                 }}
               >
-                <ClipboardCheck size={22} />
+                <ClipboardCheck size={20} />
               </div>
               <div>
-                <h1 style={{ fontSize: "1.1rem", fontWeight: "800", color: "#dc2626", lineHeight: 1.2 }}>
+                <h1 style={{ fontSize: "1.05rem", fontWeight: "800", color: "#dc2626", lineHeight: 1.2 }}>
                   Absensi Magang
                 </h1>
-                <span style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: "600", letterSpacing: "0.5px" }}>
+                <span style={{ fontSize: "0.68rem", color: "#64748b", fontWeight: "700", letterSpacing: "0.5px" }}>
                   PORTAL {user?.role?.toUpperCase()}
                 </span>
               </div>
@@ -112,20 +113,33 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
             <button
               onClick={onClose}
               style={{
-                background: "none",
+                background: "#f1f5f9",
                 border: "none",
-                color: "#94a3b8",
+                color: "#64748b",
                 cursor: "pointer",
-                padding: "0.25rem"
+                padding: "0.35rem",
+                borderRadius: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
               }}
               className="mobile-close-btn"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          {/* Navigation Links */}
-          <nav style={{ padding: "1.25rem 0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          {/* Navigation Links (Scrollable if screen height is very short) */}
+          <nav
+            style={{
+              padding: "0.85rem 0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.3rem",
+              flex: 1,
+              overflowY: "auto"
+            }}
+          >
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -139,21 +153,21 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.85rem",
+                    gap: "0.75rem",
                     width: "100%",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "0.75rem",
+                    padding: "0.65rem 0.85rem",
+                    borderRadius: "0.65rem",
                     border: "none",
                     backgroundColor: isActive ? "#dc2626" : "transparent",
                     color: isActive ? "#ffffff" : "#475569",
-                    fontSize: "0.95rem",
+                    fontSize: "0.9rem",
                     fontWeight: isActive ? "700" : "600",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     boxShadow: isActive ? "0 4px 12px rgba(220, 38, 38, 0.25)" : "none"
                   }}
                 >
-                  <Icon size={20} color={isActive ? "#ffffff" : "#64748b"} />
+                  <Icon size={18} color={isActive ? "#ffffff" : "#64748b"} />
                   {item.label}
                 </button>
               );
@@ -161,8 +175,8 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
           </nav>
         </div>
 
-        {/* Logout Footer */}
-        <div style={{ padding: "1.25rem 0.85rem", borderTop: "1px solid #e2e8f0" }}>
+        {/* Logout Footer (Always Pinned at Bottom without scrolling) */}
+        <div style={{ padding: "0.85rem 0.75rem", borderTop: "1px solid #e2e8f0", flexShrink: 0, backgroundColor: "#ffffff" }}>
           <button
             onClick={() => {
               if (onClose) onClose();
@@ -171,20 +185,20 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.85rem",
+              gap: "0.75rem",
               width: "100%",
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "0.65rem 0.85rem",
+              borderRadius: "0.65rem",
               border: "1px solid #fee2e2",
               backgroundColor: "#fef2f2",
               color: "#ef4444",
-              fontSize: "0.95rem",
+              fontSize: "0.9rem",
               fontWeight: "700",
               cursor: "pointer",
               transition: "all 0.15s ease"
             }}
           >
-            <LogOutIcon size={20} />
+            <LogOutIcon size={18} />
             Logout
           </button>
         </div>
