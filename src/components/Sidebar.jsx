@@ -36,26 +36,26 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
 
   return (
     <>
-      {/* Mobile Backdrop Overlay (higher z-index than bottom nav) */}
+      {/* Mobile Backdrop Overlay */}
       {isOpen && (
         <div
           onClick={onClose}
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
             backdropFilter: "blur(4px)",
-            zIndex: 60
+            zIndex: 40
           }}
           className="mobile-backdrop"
         />
       )}
 
-      {/* Sidebar Navigation Panel (z-index 65 so it slides OVER bottom nav) */}
+      {/* Sidebar Navigation Panel */}
       <aside
         className={`sidebar-panel ${isOpen ? "sidebar-open" : ""}`}
         style={{
-          width: "270px",
+          width: "260px",
           backgroundColor: "#ffffff",
           borderRight: "1px solid #e2e8f0",
           display: "flex",
@@ -65,8 +65,9 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
           position: "fixed",
           top: 0,
           left: 0,
-          zIndex: 65,
+          zIndex: 45,
           transition: "transform 0.3s ease",
+          boxShadow: isOpen ? "4px 0 25px rgba(0,0,0,0.15)" : "none",
           overflowY: "auto"
         }}
       >
@@ -79,11 +80,7 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
               alignItems: "center",
               justifyContent: "space-between",
               padding: "0 1.5rem",
-              borderBottom: "1px solid #e2e8f0",
-              position: "sticky",
-              top: 0,
-              backgroundColor: "#ffffff",
-              zIndex: 10
+              borderBottom: "1px solid #e2e8f0"
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -115,15 +112,11 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
             <button
               onClick={onClose}
               style={{
-                background: "#f1f5f9",
+                background: "none",
                 border: "none",
-                color: "#475569",
+                color: "#94a3b8",
                 cursor: "pointer",
-                padding: "0.4rem",
-                borderRadius: "0.5rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
+                padding: "0.25rem"
               }}
               className="mobile-close-btn"
             >
@@ -168,8 +161,8 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
           </nav>
         </div>
 
-        {/* Logout Footer (always visible with padding & clear red styling) */}
-        <div style={{ padding: "1.25rem 0.85rem 2rem 0.85rem", borderTop: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
+        {/* Logout Footer */}
+        <div style={{ padding: "1.25rem 0.85rem", borderTop: "1px solid #e2e8f0" }}>
           <button
             onClick={() => {
               if (onClose) onClose();
@@ -178,23 +171,21 @@ export default function Sidebar({ user, currentTab, setCurrentTab, onLogout, isO
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
               gap: "0.85rem",
               width: "100%",
-              padding: "0.85rem 1rem",
+              padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1.5px solid #fecaca",
+              border: "1px solid #fee2e2",
               backgroundColor: "#fef2f2",
-              color: "#dc2626",
+              color: "#ef4444",
               fontSize: "0.95rem",
-              fontWeight: "800",
+              fontWeight: "700",
               cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(220, 38, 38, 0.15)",
               transition: "all 0.15s ease"
             }}
           >
             <LogOutIcon size={20} />
-            Keluar (Logout)
+            Logout
           </button>
         </div>
       </aside>
