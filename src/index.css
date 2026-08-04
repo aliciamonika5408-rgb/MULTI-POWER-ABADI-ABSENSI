@@ -208,12 +208,6 @@ body {
     height: auto !important;
     border-radius: 0.75rem !important;
   }
-
-  /* Notification & Header Popover positioning on mobile HP */
-  .notification-dropdown {
-    width: min(290px, calc(100vw - 1.5rem)) !important;
-    right: -0.5rem !important;
-  }
 }
 
 @media (max-width: 640px) {
@@ -227,6 +221,18 @@ body {
 
   .app-header {
     padding: 0 0.75rem !important;
+  }
+
+  /* Mobile Notification Popover Centered & Span Full Screen Width */
+  .notification-dropdown {
+    position: fixed !important;
+    top: 4.25rem !important;
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    width: auto !important;
+    max-width: none !important;
+    box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.25) !important;
+    zIndex: 99 !important;
   }
 
   /* Login hero section responsiveness */
