@@ -128,7 +128,7 @@ body {
   }
   
   main {
-    padding: 1.25rem 1rem 5rem 1rem !important; /* Bottom padding so bottom nav doesn't overlap content */
+    padding: 1.25rem 1rem 2.5rem 1rem !important;
   }
 
   .mobile-toggle-btn {
@@ -139,24 +139,6 @@ body {
 @media (max-width: 768px) {
   body {
     font-size: 14px;
-  }
-
-  /* Stack header flex containers vertically when space is tight */
-  .page-header-container {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 1rem !important;
-  }
-
-  .page-header-actions {
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .page-header-actions button {
-    width: 100% !important;
-    justify-content: center !important;
   }
 
   /* Form Inputs & Touch Targets for Mobile Browsers */
@@ -187,13 +169,6 @@ body {
     padding: 1.25rem 1rem !important;
   }
 
-  /* Buttons on mobile take full natural width */
-  .mobile-full-btn,
-  .admin-action-btn-group button {
-    width: 100% !important;
-    justify-content: center !important;
-  }
-
   /* Table Touch Scroll & Responsive Styling */
   div[style*="overflowX: auto"],
   div[style*="overflow-x: auto"] {
@@ -203,7 +178,7 @@ body {
   }
 
   table {
-    min-width: 600px; /* Prevents text collapsing in mobile table cells */
+    min-width: 580px; /* Prevents text collapsing in mobile table cells */
   }
 
   th, td {
@@ -230,8 +205,22 @@ body {
 
   /* Notification & Header Popover positioning on mobile HP */
   .notification-dropdown {
-    width: min(320px, calc(100vw - 1.5rem)) !important;
+    width: min(290px, calc(100vw - 1.5rem)) !important;
     right: -0.5rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .desktop-subtitle {
+    display: none !important;
+  }
+
+  .desktop-user-name {
+    display: none !important;
+  }
+
+  .app-header {
+    padding: 0 0.75rem !important;
   }
 }
 
@@ -241,23 +230,17 @@ body {
   }
 
   h1 {
-    font-size: 1.3rem !important;
+    font-size: 1.25rem !important;
   }
 
   h2 {
-    font-size: 1.1rem !important;
+    font-size: 1.05rem !important;
   }
 
   /* Hero Banners on small phones */
   div[style*="linear-gradient"] {
     padding: 1.25rem 1rem !important;
     border-radius: 1.25rem !important;
-  }
-
-  /* Adjust icons and badge spacing */
-  .mobile-icon-lg {
-    width: 18px !important;
-    height: 18px !important;
   }
 }
 
