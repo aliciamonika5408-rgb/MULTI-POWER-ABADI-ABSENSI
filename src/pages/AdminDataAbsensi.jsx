@@ -215,14 +215,15 @@ export default function AdminDataAbsensi() {
               outline: "none",
               backgroundColor: "#ffffff",
               color: "#0f172a",
-              fontWeight: "600"
+              fontWeight: "400",
+              colorScheme: "light"
             }}
           >
-            <option value="semua" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+            <option value="semua" style={{ color: "#0f172a", backgroundColor: "#ffffff", fontWeight: "400" }}>
               Semua Siswa Magang
             </option>
             {siswaList.map((s, i) => (
-              <option key={i} value={s.id || s.nama || s.namaSiswa} style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+              <option key={i} value={s.id || s.nama || s.namaSiswa} style={{ color: "#0f172a", backgroundColor: "#ffffff", fontWeight: "400" }}>
                 {s.nama || s.namaSiswa}
               </option>
             ))}
