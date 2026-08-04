@@ -15,6 +15,8 @@ import AdminResetPassword from "./pages/AdminResetPassword";
 
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
+import MobileBottomNav from "./components/MobileBottomNav";
+
 
 import { getCurrentUser, setCurrentUser as saveSessionUser, initDB, fetchCloudDB } from "./services/db";
 
@@ -141,7 +143,15 @@ export default function App() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation for Smartphone Screens */}
+      <MobileBottomNav
+        user={user}
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+      />
+
       {/* Responsive layout styles */}
+
       <style>{`
         @media (max-width: 1024px) {
           .main-layout {

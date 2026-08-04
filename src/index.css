@@ -86,8 +86,8 @@ body {
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-  50% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
 }
 
 .animate-fade-in {
@@ -112,88 +112,125 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-/* Mobile Responsive Adjustments */
+/* Mobile Touch Optimization Utilities */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile Responsive Adjustments (Smartphones & Tablets) */
+@media (max-width: 1024px) {
+  .main-layout {
+    margin-left: 0 !important;
+  }
+  
+  main {
+    padding: 1.25rem 1rem 5rem 1rem !important; /* Bottom padding so bottom nav doesn't overlap content */
+  }
+
+  .mobile-toggle-btn {
+    display: flex !important;
+  }
+}
+
 @media (max-width: 768px) {
   body {
     font-size: 14px;
   }
 
-  main {
-    padding: 1rem 0.75rem !important;
+  /* Stack header flex containers vertically when space is tight */
+  .page-header-container {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
   }
 
-  /* Stack grid columns automatically on mobile */
-  div[style*="gridTemplateColumns: \"1fr 1fr\""],
-  div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""],
-  div[style*="grid-template-columns: 1fr 1fr"],
-  div[style*="grid-template-columns: 1fr 1fr 1fr"],
-  .grid-2-col,
-  .grid-3-col {
-    grid-template-columns: 1fr !important;
+  .page-header-actions {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
-  /* Responsive card padding on mobile */
-  .card-modern,
-  div[style*="borderRadius: \"1.5rem\""],
-  div[style*="borderRadius: \"1.25rem\""] {
-    padding: 1.25rem 1rem !important;
+  .page-header-actions button {
+    width: 100% !important;
+    justify-content: center !important;
   }
 
-  /* Form Inputs & Touch Targets */
+  /* Form Inputs & Touch Targets for Mobile Browsers */
   input[type="text"],
   input[type="password"],
   input[type="date"],
   input[type="number"],
   textarea,
   select {
-    font-size: 16px !important; /* Prevents auto-zoom on mobile Safari/Chrome */
-    padding: 0.7rem 0.85rem !important;
+    font-size: 16px !important; /* Prevents auto-zoom on mobile iOS Safari / Chrome */
+    padding: 0.75rem 0.85rem !important;
   }
 
-  /* Buttons on mobile take natural full width when stacked */
+  /* Stat cards & grid column stacking on mobile */
+  .grid-2-col,
+  .grid-3-col,
+  .grid-4-col,
+  div[style*="gridTemplateColumns: \"1fr 1fr\""],
+  div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""],
+  div[style*="gridTemplateColumns: \"repeat(auto-fit, minmax(200px, 1fr))\""] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Responsive card padding on mobile HP devices */
+  .card-modern,
+  div[style*="borderRadius: \"1.5rem\""],
+  div[style*="borderRadius: \"1.25rem\""] {
+    padding: 1.25rem 1rem !important;
+  }
+
+  /* Buttons on mobile take full natural width */
   .mobile-full-btn,
   .admin-action-btn-group button {
     width: 100% !important;
     justify-content: center !important;
   }
 
-  /* Table Smooth Touch Scroll */
+  /* Table Touch Scroll & Responsive Styling */
   div[style*="overflowX: auto"],
   div[style*="overflow-x: auto"] {
     -webkit-overflow-scrolling: touch;
     width: 100%;
+    border-radius: 0.75rem;
   }
 
   table {
-    min-width: 540px; /* Ensures tables scroll cleanly without collapsing columns */
+    min-width: 600px; /* Prevents text collapsing in mobile table cells */
   }
 
   th, td {
-    padding: 0.75rem 0.85rem !important;
+    padding: 0.75rem 0.75rem !important;
     font-size: 0.825rem !important;
   }
 
-  /* Admin & Camera Mobile Adjustments */
-  .animate-slide-right {
-    max-width: 100% !important;
-  }
-
-  .admin-action-btn-group {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  /* Modals on Mobile Devices */
+  div[style*="position: \"fixed\""][style*="zIndex: 60"] > div,
+  div[style*="position: fixed"][style*="z-index: 60"] > div {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    width: 95% !important;
+    padding: 1.25rem !important;
+    border-radius: 1.25rem !important;
   }
 
   /* Camera preview responsive aspect ratio */
   video, canvas {
     max-width: 100% !important;
     height: auto !important;
+    border-radius: 0.75rem !important;
   }
 
-  /* Notification & Header Popover positioning on mobile */
+  /* Notification & Header Popover positioning on mobile HP */
   .notification-dropdown {
-    width: min(320px, calc(100vw - 2rem)) !important;
+    width: min(320px, calc(100vw - 1.5rem)) !important;
     right: -0.5rem !important;
   }
 }
@@ -204,16 +241,23 @@ body {
   }
 
   h1 {
-    font-size: 1.35rem !important;
+    font-size: 1.3rem !important;
   }
 
   h2 {
-    font-size: 1.15rem !important;
+    font-size: 1.1rem !important;
   }
 
-  /* Reduce Hero Banner padding on small phones */
+  /* Hero Banners on small phones */
   div[style*="linear-gradient"] {
     padding: 1.25rem 1rem !important;
+    border-radius: 1.25rem !important;
+  }
+
+  /* Adjust icons and badge spacing */
+  .mobile-icon-lg {
+    width: 18px !important;
+    height: 18px !important;
   }
 }
 
