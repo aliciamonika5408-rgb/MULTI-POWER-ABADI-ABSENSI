@@ -74,6 +74,12 @@ body {
   background: var(--color-text-muted);
 }
 
+/* Fix Dropdown Select & Option Background/Text Colors */
+select, option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 /* Utility Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -156,6 +162,8 @@ body {
     font-size: 16px !important; /* Prevents auto-zoom on mobile iOS Safari / Chrome */
     padding-top: 0.75rem !important;
     padding-bottom: 0.75rem !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
   }
 
   /* Stat cards & grid column stacking on mobile */
@@ -232,7 +240,7 @@ body {
     width: auto !important;
     max-width: none !important;
     box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.25) !important;
-    zIndex: 99 !important;
+    z-index: 99 !important;
   }
 
   /* Login hero section responsiveness */
