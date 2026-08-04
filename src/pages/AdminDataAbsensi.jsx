@@ -3,10 +3,12 @@ import { Search, Calendar, Users, Printer, Download, RefreshCw } from "lucide-re
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getAttendanceRecords, getStudents } from "../services/db";
+import Toast from "../components/Toast";
 
 export default function AdminDataAbsensi() {
   const [absensiList, setAbsensiList] = useState([]);
   const [siswaList, setSiswaList] = useState([]);
+  const [toast, setToast] = useState({ message: "", type: "success" });
   
   // State untuk Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,8 +45,7 @@ export default function AdminDataAbsensi() {
       (item.ketPulang && item.ketPulang.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // 2. Filter Pilih Siswa
-    const matchSiswa =
-      selectedSiswa === "semua" || item.namaSiswa === selectedSiswa || item.siswaId === selectedSiswa;
+    const matchSiswa = selectedSiswa === "semua" || item.studentId === Number(selectedSiswa) || item.studentId === selectedSiswa;
 
     // 3. Filter Tanggal
     const matchDate = !selectedDate || item.tanggal === selectedDate;
@@ -55,7 +56,7 @@ export default function AdminDataAbsensi() {
   // FUNGSI UTAMA: Cetak & Export PDF
   const handleExportPDF = () => {
     if (filteredAbsensi.length === 0) {
-      alert("Tidak ada data absensi untuk dicetak!");
+      setToast({ message: "Tidak ada data absensi untuk dicetak!", type: "error" });
       return;
     }
 
@@ -126,6 +127,11 @@ export default function AdminDataAbsensi() {
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: "", type: "success" })}
+      />
       {/* Header Halaman */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
         <div>

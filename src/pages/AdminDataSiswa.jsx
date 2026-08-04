@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Search, UserPlus, Edit, Trash2, X, Key, Phone, Building } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, X } from "lucide-react";
 import { getStudents, addStudent, updateStudent, deleteStudent } from "../services/db";
+import ConfirmModal from "../components/ConfirmModal";
+import Toast from "../components/Toast";
 
 export default function AdminDataSiswa() {
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+
+  // State untuk Modal Hapus Reusable (Tanpa window.confirm bawaan browser)
+  const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
+
+  // State untuk Toast Notification Reusable
+  const [toast, setToast] = useState({ message: "", type: "success" });
 
   const [formData, setFormData] = useState({
     nama: "",
@@ -59,7 +67,7 @@ export default function AdminDataSiswa() {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!formData.nama.trim() || !formData.pin.trim()) {
-      alert("Nama dan PIN wajib diisi!");
+      setToast({ message: "Nama dan PIN wajib diisi!", type: "error" });
       return;
     }
 
@@ -68,17 +76,25 @@ export default function AdminDataSiswa() {
         id: editingStudent.id,
         ...formData
       });
+      setToast({ message: `Data siswa "${formData.nama}" berhasil diperbarui.`, type: "success" });
     } else {
       addStudent(formData);
+      setToast({ message: `Siswa magang baru "${formData.nama}" berhasil ditambahkan.`, type: "success" });
     }
 
     setShowModal(false);
     loadData();
   };
 
-  const handleDelete = (student) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus data siswa "${student.nama}"?`)) {
-      deleteStudent(student.id);
+  const handleDeleteClick = (student) => {
+    setDeleteConfirmStudent(student);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirmStudent) {
+      deleteStudent(deleteConfirmStudent.id);
+      setToast({ message: `Data siswa "${deleteConfirmStudent.nama}" telah berhasil dihapus.`, type: "success" });
+      setDeleteConfirmStudent(null);
       loadData();
     }
   };
@@ -95,6 +111,25 @@ export default function AdminDataSiswa() {
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: "", type: "success" })}
+      />
+
+      {/* Custom Confirm Modal Hapus */}
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmStudent)}
+        title="Hapus Data Siswa"
+        message={`Apakah Anda yakin ingin menghapus data siswa "${deleteConfirmStudent?.nama}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus Siswa"
+        cancelText="Batal"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirmStudent(null)}
+      />
+
       {/* Header Halaman */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
@@ -231,7 +266,7 @@ export default function AdminDataSiswa() {
                           <Edit size={15} />
                         </button>
                         <button
-                          onClick={() => handleDelete(s)}
+                          onClick={() => handleDeleteClick(s)}
                           title="Hapus Siswa"
                           style={{
                             backgroundColor: "#fef2f2",
