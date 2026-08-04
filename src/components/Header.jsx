@@ -134,7 +134,7 @@ export default function Header({ user, currentTab, onLogout, toggleSidebar }) {
           )}
         </div>
 
-        {/* Small Profile Avatar */}
+        {/* Small Profile Avatar & Header Logout Button */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <img
             src={user?.fotoProfil || "/default-avatar.svg"}
@@ -147,8 +147,31 @@ export default function Header({ user, currentTab, onLogout, toggleSidebar }) {
               border: "2px solid #fecaca"
             }}
           />
+
+          <button
+            onClick={onLogout}
+            title="Keluar / Logout"
+            style={{
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#dc2626",
+              padding: "0.55rem 0.75rem",
+              borderRadius: "0.75rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              fontSize: "0.8rem",
+              fontWeight: "700",
+              transition: "all 0.2s"
+            }}
+          >
+            <LogOut size={16} />
+            <span className="desktop-user-name">Keluar</span>
+          </button>
         </div>
       </div>
     </header>
+
   );
 }
