@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Calendar, Users, Printer, Download, RefreshCw } from "lucide-react";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import { getAttendanceRecords, getStudents } from "../services/db";
 import Toast from "../components/Toast";
 
@@ -90,7 +90,7 @@ export default function AdminDataAbsensi() {
     ]);
 
     // Membuat Tabel PDF dengan AutoTable
-    doc.autoTable({
+    const tableOptions = {
       startY: 37,
       head: [
         [
@@ -119,7 +119,13 @@ export default function AdminDataAbsensi() {
       alternateRowStyles: {
         fillColor: [248, 250, 252] // Warna belang tipis (#f8fafc)
       }
-    });
+    };
+
+    if (typeof autoTable === "function") {
+      autoTable(doc, tableOptions);
+    } else if (typeof doc.autoTable === "function") {
+      doc.autoTable(tableOptions);
+    }
 
     // Simpan File PDF
     doc.save(`Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.pdf`);
