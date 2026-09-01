@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Calendar, Users, Printer, FileSpreadsheet, Database, Download, X, Send } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -330,7 +330,7 @@ export default function AdminDataAbsensi() {
       setIsSendingBackup(true);
       localStorage.setItem("discord_backup_webhook_url", discordWebhookUrl.trim());
       await sendBackupToDiscord(discordWebhookUrl.trim());
-      setToast({ message: "ðŸš€ Berhasil mengirim backup SQL ke channel Discord!", type: "success" });
+      setToast({ message: "🚀 Berhasil mengirim backup SQL ke channel Discord!", type: "success" });
       setShowBackupModal(false);
     } catch (err) {
       console.error("Discord Backup Error:", err);
