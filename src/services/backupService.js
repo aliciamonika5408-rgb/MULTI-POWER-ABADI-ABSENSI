@@ -180,42 +180,56 @@ export const sendBackupToDiscord = async (customWebhookUrl = null, isScheduled =
   formData.append("files[0]", blob, `backup_db_absensi_${dateStr}.sql`);
 
   const payload = {
-    content: isScheduled
-      ? "⏰ **[JADWAL RUTIN 7 HARI] Auto-Backup Database Absensi Magang Berhasil!**"
-      : "📢 **[MANUAL BACKUP] Database Absensi Magang Berhasil Diekspor!**",
+    username: "Multi Power Abadi • Sentinel",
+    avatar_url: "https://cdn-icons-png.flaticon.com/512/906/906343.png",
     embeds: [
       {
+        author: {
+          name: "PT. MULTI POWER ABADI — Database Sentinel",
+          icon_url: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+        },
         title: isScheduled
-          ? "📦 Auto-Backup Mingguan (7 Hari) - PT. Multi Power Abadi"
-          : "📦 Database SQL Backup - PT. Multi Power Abadi",
+          ? "🟢 Cadangan Database Mingguan (Otomatis) Sukses"
+          : "📦 Cadangan Database Manual (Admin) Sukses",
         description: isScheduled
-          ? "Backup rutin otomatis setiap 7 hari sekali. Berkas `.sql` terlampir di bawah ini untuk cadangan database Supabase."
-          : "Berikut adalah lampiran berkas file `.sql` cadangan lengkap yang bisa di-import langsung ke Supabase / PostgreSQL.",
-        color: isScheduled ? 5793266 : 14428454, // Hijau (#5865F2 / #10B981) jika terjadwal, Merah (#DC2626) jika manual
+          ? "Sistem telah mencadangkan seluruh data siswa & riwayat presensi secara berkala. Berkas `.sql` terlampir di bawah untuk arsip mandiri."
+          : "Admin telah mengekspor cadangan basis data. Berkas `.sql` terlampir di bawah dan siap di-restore kapan pun ke Supabase / PostgreSQL.",
+        color: isScheduled ? 1096065 : 14428454, // Emerald Green jika Terjadwal, Ruby Merah jika Manual
         fields: [
           {
-            name: "📅 Waktu Backup",
-            value: `${dateStr} pukul ${timeStr} WIB`,
+            name: "⚡ Status",
+            value: isScheduled ? "```diff\n+ AUTO RUN (7 HARI)\n```" : "```fix\nMANUAL EXPORT (ADMIN)\n```",
             inline: true
           },
           {
-            name: "👥 Total Siswa/User",
-            value: `${users.length} Akun`,
+            name: "⏱️ Tipe Cadangan",
+            value: isScheduled ? "```fix\nJadwal Rutin Sistem\n```" : "```fix\nEkspor Mandiri\n```",
             inline: true
           },
           {
-            name: "📝 Total Data Absensi",
-            value: `${attendance.length} Catatan Presensi`,
+            name: "📅 Waktu Eksekusi",
+            value: `\`\`\`yaml\n${dateStr} • ${timeStr} WIB\n\`\`\``,
+            inline: false
+          },
+          {
+            name: "👥 Siswa Terdaftar",
+            value: `**\`${users.length}\`** Akun Siswa`,
             inline: true
           },
           {
-            name: "🔄 Tipe Backup",
-            value: isScheduled ? "⏰ Otomatis Tiap 7 Hari" : "👤 Manual oleh Admin",
+            name: "📋 Catatan Presensi",
+            value: `**\`${attendance.length}\`** Data Absen`,
+            inline: true
+          },
+          {
+            name: "💾 Berkas SQL",
+            value: `\`backup_db_absensi_${dateStr}.sql\``,
             inline: true
           }
         ],
         footer: {
-          text: "Sistem Manajemen Absensi Siswa Magang • PT. Multi Power Abadi"
+          text: "Multi Power Abadi Sentinel • Backup Engine v2.1",
+          icon_url: "https://cdn-icons-png.flaticon.com/512/1006/1006771.png"
         },
         timestamp: new Date().toISOString()
       }
