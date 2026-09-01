@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Users, Printer, FileSpreadsheet } from "lucide-react";
+import { Search, Calendar, Users, Printer, FileSpreadsheet, Database, Download, X, Send } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import { getAttendanceRecords, getStudents } from "../services/db";
+import { sendBackupToDiscord, downloadSQLBackup } from "../services/backupService";
 import Toast from "../components/Toast";
 
 export default function AdminDataAbsensi() {
@@ -15,6 +16,13 @@ export default function AdminDataAbsensi() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSiswa, setSelectedSiswa] = useState("semua");
   const [selectedDate, setSelectedDate] = useState("");
+
+  // State untuk Backup Modal & Discord Webhook
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState(
+    () => localStorage.getItem("discord_backup_webhook_url") || import.meta.env.VITE_DISCORD_WEBHOOK_URL || ""
+  );
+  const [isSendingBackup, setIsSendingBackup] = useState(false);
 
   const loadData = () => {
     const dataAbsensi = getAttendanceRecords() || [];
@@ -310,6 +318,27 @@ export default function AdminDataAbsensi() {
     }
   };
 
+  // FUNGSI 3: Kirim Backup SQL ke Discord Webhook
+  const handleSendToDiscord = async () => {
+    if (!discordWebhookUrl || !discordWebhookUrl.trim().startsWith("https://discord.com/api/webhooks/")) {
+      setToast({ message: "Masukkan URL Discord Webhook yang valid!", type: "error" });
+      return;
+    }
+
+    try {
+      setIsSendingBackup(true);
+      localStorage.setItem("discord_backup_webhook_url", discordWebhookUrl.trim());
+      await sendBackupToDiscord(discordWebhookUrl.trim());
+      setToast({ message: "🚀 Berhasil mengirim backup SQL ke channel Discord!", type: "success" });
+      setShowBackupModal(false);
+    } catch (err) {
+      console.error("Discord Backup Error:", err);
+      setToast({ message: `Gagal mengirim backup: ${err.message}`, type: "error" });
+    } finally {
+      setIsSendingBackup(false);
+    }
+  };
+
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <Toast
@@ -317,6 +346,7 @@ export default function AdminDataAbsensi() {
         type={toast.type}
         onClose={() => setToast({ message: "", type: "success" })}
       />
+
       {/* Header Halaman */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
@@ -328,8 +358,30 @@ export default function AdminDataAbsensi() {
           </p>
         </div>
 
-        {/* Tombol Aksi (Export PDF & Excel) */}
+        {/* Tombol Aksi (Backup, Export Excel, Export PDF) */}
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {/* Tombol Backup Database */}
+          <button
+            onClick={() => setShowBackupModal(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              backgroundColor: "#4f46e5",
+              color: "#ffffff",
+              border: "none",
+              padding: "0.6rem 1.25rem",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(79, 70, 229, 0.2)",
+              transition: "all 0.2s"
+            }}
+          >
+            <Database size={18} /> Backup Database (Discord/SQL)
+          </button>
+
           {/* Tombol Export Excel */}
           <button
             onClick={handleExportExcel}
@@ -510,6 +562,202 @@ export default function AdminDataAbsensi() {
           </table>
         </div>
       </div>
+
+      {/* MODAL BACKUP DATABASE (DISCORD WEBHOOK & SQL DUMP) */}
+      {showBackupModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "1rem",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              overflow: "hidden",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "1.25rem 1.5rem",
+                borderBottom: "1px solid #f1f5f9",
+                backgroundColor: "#f8fafc"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <div
+                  style={{
+                    backgroundColor: "#e0e7ff",
+                    color: "#4f46e5",
+                    padding: "0.5rem",
+                    borderRadius: "0.5rem",
+                    display: "flex"
+                  }}
+                >
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "#0f172a", margin: 0 }}>
+                    Backup Database
+                  </h3>
+                  <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "2px 0 0 0" }}>
+                    Kirim berkas cadangan .SQL ke Discord Webhook atau unduh ke komputer
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackupModal(false)}
+                style={{
+                  border: "none",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "0.25rem",
+                  borderRadius: "0.375rem"
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "1.5rem" }}>
+              {/* Ringkasan Data */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "0.75rem",
+                  marginBottom: "1.25rem"
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e2e8f0"
+                  }}
+                >
+                  <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>Total Akun / Siswa</span>
+                  <p style={{ fontSize: "1.125rem", fontWeight: "800", color: "#0f172a", margin: "4px 0 0 0" }}>
+                    {siswaList.length} Siswa
+                  </p>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e2e8f0"
+                  }}
+                >
+                  <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>Total Catatan Presensi</span>
+                  <p style={{ fontSize: "1.125rem", fontWeight: "800", color: "#0f172a", margin: "4px 0 0 0" }}>
+                    {absensiList.length} Catatan
+                  </p>
+                </div>
+              </div>
+
+              {/* Input Discord Webhook */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "700", color: "#334155", marginBottom: "0.5rem" }}>
+                  Discord Webhook URL
+                </label>
+                <input
+                  type="text"
+                  value={discordWebhookUrl}
+                  onChange={(e) => setDiscordWebhookUrl(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "0.825rem",
+                    outline: "none",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "4px" }}>
+                  URL ini akan otomatis disimpan di browser Anda untuk backup selanjutnya.
+                </p>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {/* Tombol Kirim ke Discord */}
+                <button
+                  onClick={handleSendToDiscord}
+                  disabled={isSendingBackup}
+                  style={{
+                    width: "100%",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    backgroundColor: isSendingBackup ? "#94a3b8" : "#5865F2", // Discord Blurple
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    fontWeight: "700",
+                    cursor: isSendingBackup ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 4px rgba(88, 101, 242, 0.25)"
+                  }}
+                >
+                  <Send size={18} /> {isSendingBackup ? "Sedang Mengirim ke Discord..." : "Kirim Backup .SQL ke Discord"}
+                </button>
+
+                {/* Tombol Unduh SQL Manual */}
+                <button
+                  onClick={() => {
+                    downloadSQLBackup();
+                    setToast({ message: "File .SQL berhasil diunduh ke komputer!", type: "success" });
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    backgroundColor: "#f1f5f9",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    padding: "0.65rem 1rem",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Download size={18} /> Unduh File .SQL ke Laptop
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}
