@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { UserPlus, Edit, Trash2, Search, X, Check } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, X } from "lucide-react";
 import { getStudents, addStudent, updateStudent, deleteStudent } from "../services/db";
+import ConfirmModal from "../components/ConfirmModal";
+import Toast from "../components/Toast";
 
 export default function AdminDataSiswa() {
   const [students, setStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
-  const [successMsg, setSuccessMsg] = useState("");
 
-  // Form Fields (password removed, strictly uses PIN login)
+  // State untuk Modal Hapus Reusable (Tanpa window.confirm bawaan browser)
+  const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
+
+  // State untuk Toast Notification Reusable
+  const [toast, setToast] = useState({ message: "", type: "success" });
+
   const [formData, setFormData] = useState({
     nama: "",
     pin: "",
@@ -19,7 +25,8 @@ export default function AdminDataSiswa() {
   });
 
   const loadData = () => {
-    setStudents(getStudents());
+    const data = getStudents() || [];
+    setStudents(data);
   };
 
   useEffect(() => {
@@ -37,10 +44,10 @@ export default function AdminDataSiswa() {
     setEditingStudent(null);
     setFormData({
       nama: "",
-      pin: "",
-      sekolah: "SMKN 1 Surabaya",
+      pin: Math.floor(10000 + Math.random() * 90000).toString(),
+      sekolah: "",
       tempatMagang: "PT. MULTI POWER ABADI",
-      noHp: "081234567890"
+      noHp: ""
     });
     setShowModal(true);
   };
@@ -48,7 +55,7 @@ export default function AdminDataSiswa() {
   const handleOpenEditModal = (student) => {
     setEditingStudent(student);
     setFormData({
-      nama: student.nama,
+      nama: student.nama || "",
       pin: student.pin || "",
       sekolah: student.sekolah || "",
       tempatMagang: student.tempatMagang || "PT. MULTI POWER ABADI",
@@ -59,45 +66,79 @@ export default function AdminDataSiswa() {
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!formData.pin || formData.pin.trim().length < 4) {
-      alert("PIN Login wajib diisi minimal 4-5 digit angka.");
+    if (!formData.nama.trim() || !formData.pin.trim()) {
+      setToast({ message: "Nama dan PIN wajib diisi!", type: "error" });
       return;
     }
 
     if (editingStudent) {
-      updateStudent({ id: editingStudent.id, ...formData });
-      setSuccessMsg(`Data siswa "${formData.nama}" berhasil diperbarui.`);
+      updateStudent({
+        id: editingStudent.id,
+        ...formData
+      });
+      setToast({ message: `Data siswa "${formData.nama}" berhasil diperbarui.`, type: "success" });
     } else {
       addStudent(formData);
-      setSuccessMsg(`Siswa baru "${formData.nama}" berhasil ditambahkan.`);
+      setToast({ message: `Siswa magang baru "${formData.nama}" berhasil ditambahkan.`, type: "success" });
     }
+
     setShowModal(false);
     loadData();
-    setTimeout(() => setSuccessMsg(""), 4000);
   };
 
-  const handleDelete = (student) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus siswa ${student.nama}?`)) {
-      deleteStudent(student.id);
-      setSuccessMsg(`Siswa "${student.nama}" telah dihapus.`);
+  const handleDeleteClick = (student) => {
+    setDeleteConfirmStudent(student);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirmStudent) {
+      deleteStudent(deleteConfirmStudent.id);
+      setToast({ message: `Data siswa "${deleteConfirmStudent.nama}" telah berhasil dihapus.`, type: "success" });
+      setDeleteConfirmStudent(null);
       loadData();
-      setTimeout(() => setSuccessMsg(""), 4000);
     }
   };
 
-  const filteredStudents = students.filter(s =>
-    s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.sekolah.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.tempatMagang.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = students.filter((s) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      (s.nama && s.nama.toLowerCase().includes(query)) ||
+      (s.pin && s.pin.includes(query)) ||
+      (s.sekolah && s.sekolah.toLowerCase().includes(query)) ||
+      (s.noHp && s.noHp.includes(query))
+    );
+  });
 
   return (
-    <div className="animate-fade-in" style={{ paddingBottom: "2rem" }}>
-      {/* Header & Add Action */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1.5rem" }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      {/* Toast Notification */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: "", type: "success" })}
+      />
+
+      {/* Custom Confirm Modal Hapus */}
+      <ConfirmModal
+        isOpen={Boolean(deleteConfirmStudent)}
+        title="Hapus Data Siswa"
+        message={`Apakah Anda yakin ingin menghapus data siswa "${deleteConfirmStudent?.nama}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus Siswa"
+        cancelText="Batal"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirmStudent(null)}
+      />
+
+      {/* Header Halaman */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#0f172a" }}>Data Siswa Magang</h1>
-          <p style={{ fontSize: "0.875rem", color: "#64748b" }}>Kelola akun siswa dan PIN login presensi.</p>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#0f172a" }}>
+            Data Siswa Magang
+          </h1>
+          <p style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "4px" }}>
+            Kelola daftar siswa magang, PIN login, sekolah instansi, dan informasi kontak.
+          </p>
         </div>
 
         <button
@@ -108,40 +149,21 @@ export default function AdminDataSiswa() {
             gap: "0.5rem",
             backgroundColor: "#dc2626",
             color: "#ffffff",
-            padding: "0.75rem 1.25rem",
-            borderRadius: "0.75rem",
-            fontWeight: "700",
             border: "none",
+            padding: "0.65rem 1.25rem",
+            borderRadius: "0.5rem",
+            fontSize: "0.875rem",
+            fontWeight: "700",
             cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(220, 38, 38, 0.25)"
+            boxShadow: "0 2px 4px rgba(220, 38, 38, 0.2)",
+            transition: "all 0.2s"
           }}
         >
-          <UserPlus size={18} /> Tambah Siswa
+          <UserPlus size={18} /> Tambah Siswa Baru
         </button>
       </div>
 
-      {/* Success Notification Banner */}
-      {successMsg && (
-        <div
-          style={{
-            backgroundColor: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#047857",
-            padding: "0.85rem 1.25rem",
-            borderRadius: "0.85rem",
-            fontSize: "0.9rem",
-            fontWeight: "700",
-            marginBottom: "1.25rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          }}
-        >
-          <Check size={18} /> {successMsg}
-        </div>
-      )}
-
-      {/* Search Input Bar */}
+      {/* Filter Bar / Search */}
       <div
         style={{
           backgroundColor: "#ffffff",
@@ -151,13 +173,13 @@ export default function AdminDataSiswa() {
           marginBottom: "1.5rem"
         }}
       >
-        <div style={{ position: "relative" }}>
-          <Search size={18} color="#94a3b8" style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)" }} />
+        <div style={{ position: "relative", maxWidth: "400px" }}>
+          <Search size={18} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
           <input
             type="text"
-            placeholder="Cari nama siswa, sekolah, atau tempat magang..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari nama, PIN, atau asal sekolah..."
             style={{
               width: "100%",
               padding: "0.65rem 1rem 0.65rem 2.65rem",
@@ -170,83 +192,65 @@ export default function AdminDataSiswa() {
         </div>
       </div>
 
-      {/* Main Student Data Table */}
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "1.25rem",
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.05)",
-          overflow: "hidden"
-        }}
-      >
+      {/* Tabel Data Siswa */}
+      <div style={{ backgroundColor: "#ffffff", borderRadius: "0.75rem", border: "1px solid #e2e8f0", overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
             <thead>
               <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#475569" }}>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700" }}>Nama Siswa</th>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700" }}>PIN LOGIN (5 DIGIT)</th>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700" }}>Sekolah</th>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700" }}>Tempat Magang</th>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700" }}>No HP</th>
-                <th style={{ padding: "1rem 1.25rem", fontWeight: "700", textAlign: "center" }}>Aksi</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Siswa Magang</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>PIN Login</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Asal Sekolah / Instansi</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>Tempat Magang</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>No. HP / WhatsApp</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", textAlign: "center" }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filteredStudents.length > 0 ? (
-                filteredStudents.map(s => (
+                filteredStudents.map((s) => (
                   <tr key={s.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    {/* Nama & Foto */}
-                    <td style={{ padding: "0.85rem 1.25rem" }}>
+                    <td style={{ padding: "0.85rem 1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                         <img
-                          src={s.fotoProfil || "/default-avatar.svg"}
+                          src={s.fotoProfil || "/default-avatar.png"}
                           alt={s.nama}
-                          style={{ width: "2.5rem", height: "2.5rem", borderRadius: "50%", objectFit: "cover" }}
+                          onError={(e) => { e.target.src = "/default-avatar.png"; }}
+                          style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: "1px solid #cbd5e1" }}
                         />
                         <div>
-                          <span style={{ fontWeight: "700", color: "#0f172a", display: "block" }}>{s.nama}</span>
+                          <div style={{ fontWeight: "700", color: "#0f172a" }}>{s.nama}</div>
+                          <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ID: {s.id}</div>
                         </div>
                       </div>
                     </td>
-
-                    {/* PIN Siswa */}
-                    <td style={{ padding: "0.85rem 1.25rem" }}>
+                    <td style={{ padding: "0.85rem 1rem" }}>
                       <span
                         style={{
-                          backgroundColor: "#ecfdf5",
-                          color: "#047857",
-                          border: "1px solid #a7f3d0",
-                          padding: "0.35rem 0.75rem",
-                          borderRadius: "0.6rem",
-                          fontSize: "0.9rem",
+                          backgroundColor: "#f0fdf4",
+                          color: "#166534",
+                          border: "1px solid #bbf7d0",
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "0.375rem",
                           fontWeight: "800",
                           fontFamily: "monospace",
-                          letterSpacing: "1px"
+                          fontSize: "0.85rem"
                         }}
                         title="PIN Akun Siswa untuk Login"
                       >
-                        🔑 {s.pin || "12121"}
+                        🔑 {s.pin}
                       </span>
                     </td>
-
-                    {/* Sekolah */}
-                    <td style={{ padding: "0.85rem 1.25rem", color: "#334155", fontWeight: "600" }}>
-                      {s.sekolah}
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155", fontWeight: "500" }}>
+                      {s.sekolah || "-"}
                     </td>
-
-                    {/* Tempat Magang */}
-                    <td style={{ padding: "0.85rem 1.25rem", color: "#334155", fontWeight: "600" }}>
-                      {s.tempatMagang}
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155", fontWeight: "600" }}>
+                      {s.tempatMagang || "PT. MULTI POWER ABADI"}
                     </td>
-
-                    {/* No HP */}
-                    <td style={{ padding: "0.85rem 1.25rem", color: "#334155", fontWeight: "600" }}>
+                    <td style={{ padding: "0.85rem 1rem", color: "#334155" }}>
                       {s.noHp || "-"}
                     </td>
-
-                    {/* Action buttons */}
-                    <td style={{ padding: "0.85rem 1.25rem" }}>
+                    <td style={{ padding: "0.85rem 1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
                         <button
                           onClick={() => handleOpenEditModal(s)}
@@ -257,16 +261,13 @@ export default function AdminDataSiswa() {
                             border: "1px solid #bfdbfe",
                             padding: "0.4rem 0.6rem",
                             borderRadius: "0.5rem",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center"
+                            cursor: "pointer"
                           }}
                         >
                           <Edit size={15} />
                         </button>
-
                         <button
-                          onClick={() => handleDelete(s)}
+                          onClick={() => handleDeleteClick(s)}
                           title="Hapus Siswa"
                           style={{
                             backgroundColor: "#fef2f2",
@@ -274,9 +275,7 @@ export default function AdminDataSiswa() {
                             border: "1px solid #fecaca",
                             padding: "0.4rem 0.6rem",
                             borderRadius: "0.5rem",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center"
+                            cursor: "pointer"
                           }}
                         >
                           <Trash2 size={15} />
@@ -287,7 +286,7 @@ export default function AdminDataSiswa() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" style={{ padding: "2.5rem", textAlign: "center", color: "#94a3b8" }}>
+                  <td colSpan="6" style={{ padding: "3rem 1rem", textAlign: "center", color: "#94a3b8" }}>
                     Tidak ada siswa ditemukan.
                   </td>
                 </tr>
@@ -313,7 +312,6 @@ export default function AdminDataSiswa() {
           }}
         >
           <div
-            className="animate-fade-in"
             style={{
               backgroundColor: "#ffffff",
               borderRadius: "1.5rem",
@@ -350,7 +348,7 @@ export default function AdminDataSiswa() {
 
               <div style={{ marginBottom: "1rem" }}>
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: "#dc2626", marginBottom: "0.2rem" }}>
-                  🔑 PIN LOGIN (5 DIGIT) *
+                  🔑 PIN LOGIN (5-6 DIGIT) *
                 </label>
                 <input
                   type="text"
@@ -358,7 +356,7 @@ export default function AdminDataSiswa() {
                   onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/[^0-9]/g, "") })}
                   required
                   maxLength={6}
-                  placeholder="Masukkan 5 digit PIN login siswa..."
+                  placeholder="Masukkan PIN login siswa..."
                   style={{ width: "100%", padding: "0.65rem 0.85rem", borderRadius: "0.5rem", border: "1.5px solid #a7f3d0", fontSize: "0.95rem", fontFamily: "monospace", fontWeight: "800", backgroundColor: "#ecfdf5", color: "#047857" }}
                 />
               </div>
@@ -372,6 +370,7 @@ export default function AdminDataSiswa() {
                     type="text"
                     value={formData.sekolah}
                     onChange={(e) => setFormData({ ...formData, sekolah: e.target.value })}
+                    placeholder="SMKN 2 SURABAYA..."
                     style={{ width: "100%", padding: "0.6rem 0.85rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
                   />
                 </div>

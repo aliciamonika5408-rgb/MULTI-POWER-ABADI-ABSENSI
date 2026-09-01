@@ -1,0 +1,95 @@
+name: ⏰ Weekly Database SQL Backup to Discord
+
+on:
+  schedule:
+    # Berjalan otomatis setiap hari Minggu pukul 00:00 UTC (07:00 WIB)
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Memungkinkan tombol "Run workflow" manual di GitHub Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Dependencies
+        run: npm ci || npm install
+
+      - name: 🚀 Run & Send Weekly SQL Backup to Discord
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ncxcmzuqhndzuzbskfxf.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_kM4a_hsiZ9Xm6X90r4ILGQ_BaWZIG_S' }}
+          VITE_DISCORD_WEBHOOK_URL: ${{ secrets.VITE_DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1544258389444657196/0izuw-4rftmFy2EpQ4Yv8TJaVzSf85yLsg8R_fD59NAX382B1vcBLg6-Y1B7iwvbTc4X' }}
+        run: |
+          node -e "
+          const { createClient } = require('@supabase/supabase-js');
+          const supabaseUrl = process.env.VITE_SUPABASE_URL;
+          const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+          const webhookUrl = process.env.VITE_DISCORD_WEBHOOK_URL;
+
+          const supabase = createClient(supabaseUrl, supabaseKey);
+
+          async function runBackup() {
+            console.log('Fetching users and absensi data from Supabase...');
+            const { data: users } = await supabase.from('users').select('*');
+            const { data: absensi } = await supabase.from('absensi').select('*');
+
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const timeStr = new Date().toLocaleTimeString('id-ID');
+
+            let sql = '-- DATABASE WEEKLY BACKUP (GitHub Actions Scheduled)\n';
+            sql += '-- Date: ' + new Date().toISOString() + '\n\n';
+
+            if (users && users.length > 0) {
+              sql += '-- USERS TABLE\n';
+              sql += 'INSERT INTO users (id, nama, pin, role, sekolah, tempat_magang, no_hp, foto_profil) VALUES\n';
+              const uVals = users.map(u => \"('\" + u.id + \"', '\" + (u.nama||'').replace(/'/g, \"''\") + \"', '\" + u.pin + \"', '\" + u.role + \"', '\" + (u.sekolah||'').replace(/'/g, \"''\") + \"', '\" + (u.tempat_magang||'').replace(/'/g, \"''\") + \"', '\" + (u.no_hp||'') + \"', '\" + (u.foto_profil||'') + \"')\");
+              sql += uVals.join(',\n') + '\nON CONFLICT (id) DO NOTHING;\n\n';
+            }
+
+            if (absensi && absensi.length > 0) {
+              sql += '-- ABSENSI TABLE\n';
+              sql += 'INSERT INTO absensi (id, student_id, nama_siswa, tanggal, jam_masuk, keterangan_masuk, jam_pulang, keterangan_pulang, status, latitude, longitude, jarak_meters, status_lokasi) VALUES\n';
+              const aVals = absensi.map(a => \"('\" + a.id + \"', '\" + a.student_id + \"', '\" + (a.nama_siswa||'').replace(/'/g, \"''\") + \"', '\" + a.tanggal + \"', '\" + (a.jam_masuk||'-') + \"', '\" + (a.keterangan_masuk||'-').replace(/'/g, \"''\") + \"', '\" + (a.jam_pulang||'-') + \"', '\" + (a.keterangan_pulang||'-').replace(/'/g, \"''\") + \"', '\" + (a.status||'Hadir') + \"', \" + (a.latitude || 'NULL') + \", \" + (a.longitude || 'NULL') + \", \" + (a.jarak_meters || 0) + \", '\" + (a.status_lokasi||'Di Area Magang').replace(/'/g, \"''\") + \"')\");
+              sql += aVals.join(',\n') + '\nON CONFLICT (id) DO NOTHING;\n\n';
+            }
+
+            const formData = new FormData();
+            const blob = new Blob([sql], { type: 'text/plain' });
+            formData.append('files[0]', blob, 'backup_weekly_absensi_' + dateStr + '.sql');
+
+            const payload = {
+              content: '⏰ **[AUTO 7-DAYS BACKUP] Backup Otomatis Mingguan Berhasil Dieksekusi!**',
+              embeds: [{
+                title: '📦 GitHub Actions Scheduled Backup - PT. Multi Power Abadi',
+                description: 'Backup otomatis database mingguan dijalankan oleh GitHub Actions. File `.sql` terlampir di bawah ini.',
+                color: 5793266,
+                fields: [
+                  { name: '📅 Waktu Eksekusi', value: dateStr + ' ' + timeStr + ' WIB', inline: true },
+                  { name: '👥 Total Siswa Terdata', value: (users ? users.length : 0) + ' Siswa', inline: true },
+                  { name: '📝 Total Data Absensi', value: (absensi ? absensi.length : 0) + ' Baris', inline: true },
+                  { name: '🤖 Trigger', value: 'GitHub Actions Cron (7 Hari)', inline: true }
+                ],
+                footer: { text: 'Sistem Otomatis Absensi Magang • PT. Multi Power Abadi' },
+                timestamp: new Date().toISOString()
+              }]
+            };
+            formData.append('payload_json', JSON.stringify(payload));
+
+            const res = await fetch(webhookUrl, { method: 'POST', body: formData });
+            console.log('Discord webhook backup response status:', res.status);
+            if (!res.ok) throw new Error('Webhook failed with status ' + res.status);
+          }
+
+          runBackup().catch(e => {
+            console.error('Backup error:', e);
+            process.exit(1);
+          });
+          "

@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
+  color-scheme: light;
   --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   
   --color-primary: #dc2626;
@@ -56,6 +57,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  color-scheme: light;
 }
 
 /* Custom Scrollbars */
@@ -74,6 +76,14 @@ body {
   background: var(--color-text-muted);
 }
 
+/* Fix Dropdown Select & Option Native Control Styling */
+select, option {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  font-weight: 400 !important;
+}
+
 /* Utility Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -86,8 +96,8 @@ body {
 }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
-  50% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
 }
 
 .animate-fade-in {
@@ -96,6 +106,11 @@ body {
 
 .animate-slide-right {
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Helper Class for Inputs with Icons */
+.input-with-icon {
+  padding-left: 2.75rem !important;
 }
 
 /* Modern Card styling */
@@ -112,89 +127,137 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-/* Mobile Responsive Adjustments */
+/* Mobile Touch Optimization Utilities */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile Responsive Adjustments (Smartphones & Tablets) */
+@media (max-width: 1024px) {
+  .main-layout {
+    margin-left: 0 !important;
+  }
+  
+  main {
+    padding: 1.25rem 1rem 2.5rem 1rem !important;
+  }
+
+  .mobile-toggle-btn {
+    display: flex !important;
+  }
+}
+
 @media (max-width: 768px) {
   body {
     font-size: 14px;
   }
 
-  main {
-    padding: 1rem 0.75rem !important;
-  }
-
-  /* Stack grid columns automatically on mobile */
-  div[style*="gridTemplateColumns: \"1fr 1fr\""],
-  div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""],
-  div[style*="grid-template-columns: 1fr 1fr"],
-  div[style*="grid-template-columns: 1fr 1fr 1fr"],
-  .grid-2-col,
-  .grid-3-col {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Responsive card padding on mobile */
-  .card-modern,
-  div[style*="borderRadius: \"1.5rem\""],
-  div[style*="borderRadius: \"1.25rem\""] {
-    padding: 1.25rem 1rem !important;
-  }
-
-  /* Form Inputs & Touch Targets */
+  /* Form Inputs & Touch Targets for Mobile Browsers */
   input[type="text"],
   input[type="password"],
   input[type="date"],
   input[type="number"],
   textarea,
   select {
-    font-size: 16px !important; /* Prevents auto-zoom on mobile Safari/Chrome */
-    padding: 0.7rem 0.85rem !important;
+    font-size: 16px !important; /* Prevents auto-zoom on mobile iOS Safari / Chrome */
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    color: #1e293b !important;
+    background-color: #ffffff !important;
+    font-weight: 400 !important;
+    color-scheme: light !important;
   }
 
-  /* Buttons on mobile take natural full width when stacked */
-  .mobile-full-btn,
-  .admin-action-btn-group button {
-    width: 100% !important;
-    justify-content: center !important;
+  /* Stat cards & grid column stacking on mobile */
+  .grid-2-col,
+  .grid-3-col,
+  .grid-4-col,
+  div[style*="gridTemplateColumns: \"1fr 1fr\""],
+  div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""],
+  div[style*="gridTemplateColumns: \"repeat(auto-fit, minmax(200px, 1fr))\""] {
+    grid-template-columns: 1fr !important;
   }
 
-  /* Table Smooth Touch Scroll */
+  /* Responsive card padding on mobile HP devices */
+  .card-modern,
+  div[style*="borderRadius: \"1.5rem\""],
+  div[style*="borderRadius: \"1.25rem\""] {
+    padding: 1.25rem 1rem !important;
+  }
+
+  /* Table Touch Scroll & Responsive Styling */
   div[style*="overflowX: auto"],
   div[style*="overflow-x: auto"] {
     -webkit-overflow-scrolling: touch;
     width: 100%;
+    border-radius: 0.75rem;
   }
 
   table {
-    min-width: 540px; /* Ensures tables scroll cleanly without collapsing columns */
+    min-width: 580px; /* Prevents text collapsing in mobile table cells */
   }
 
   th, td {
-    padding: 0.75rem 0.85rem !important;
+    padding: 0.75rem 0.75rem !important;
     font-size: 0.825rem !important;
   }
 
-  /* Admin & Camera Mobile Adjustments */
-  .animate-slide-right {
-    max-width: 100% !important;
-  }
-
-  .admin-action-btn-group {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  /* Modals on Mobile Devices */
+  div[style*="position: \"fixed\""][style*="zIndex: 60"] > div,
+  div[style*="position: fixed"][style*="z-index: 60"] > div {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    width: 95% !important;
+    padding: 1.25rem !important;
+    border-radius: 1.25rem !important;
   }
 
   /* Camera preview responsive aspect ratio */
   video, canvas {
     max-width: 100% !important;
     height: auto !important;
+    border-radius: 0.75rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .desktop-subtitle {
+    display: none !important;
   }
 
-  /* Notification & Header Popover positioning on mobile */
+  .desktop-user-name {
+    display: none !important;
+  }
+
+  .app-header {
+    padding: 0 0.75rem !important;
+  }
+
+  /* Mobile Notification Popover Centered & Span Full Screen Width */
   .notification-dropdown {
-    width: min(320px, calc(100vw - 2rem)) !important;
-    right: -0.5rem !important;
+    position: fixed !important;
+    top: 4.25rem !important;
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    width: auto !important;
+    max-width: none !important;
+    box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.25) !important;
+    z-index: 99 !important;
+  }
+
+  /* Login hero section responsiveness */
+  .login-left-hero {
+    display: none !important;
+  }
+
+  .admin-login-back-btn {
+    position: static !important;
+    margin-bottom: 1.25rem !important;
+    align-self: flex-start !important;
   }
 }
 
@@ -204,16 +267,17 @@ body {
   }
 
   h1 {
-    font-size: 1.35rem !important;
+    font-size: 1.25rem !important;
   }
 
   h2 {
-    font-size: 1.15rem !important;
+    font-size: 1.05rem !important;
   }
 
-  /* Reduce Hero Banner padding on small phones */
+  /* Hero Banners on small phones */
   div[style*="linear-gradient"] {
     padding: 1.25rem 1rem !important;
+    border-radius: 1.25rem !important;
   }
 }
 

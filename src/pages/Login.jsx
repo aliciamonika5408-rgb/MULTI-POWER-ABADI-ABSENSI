@@ -294,8 +294,9 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                     PIN Siswa
                   </label>
                   <div style={{ position: "relative" }}>
-                    <Lock size={18} color="#94a3b8" style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)" }} />
+                    <Lock size={18} color="#94a3b8" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
                     <input
+                      className="input-with-icon"
                       type="password"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -306,10 +307,13 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                       required
                       style={{
                         width: "100%",
-                        padding: "0.85rem 1rem 0.85rem 2.75rem",
+                        paddingLeft: "2.75rem !important",
+                        paddingRight: "1rem",
+                        paddingTop: "0.85rem",
+                        paddingBottom: "0.85rem",
                         borderRadius: "0.75rem",
                         border: "1.5px solid #cbd5e1",
-                        fontSize: "1.25rem",
+                        fontSize: "1.15rem",
                         letterSpacing: "4px",
                         fontWeight: "800",
                         color: "#0f172a",
@@ -387,14 +391,15 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                     Nama Lengkap *
                   </label>
                   <div style={{ position: "relative" }}>
-                    <User size={16} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
+                    <User size={18} color="#94a3b8" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
                     <input
+                      className="input-with-icon"
                       type="text"
                       value={regNama}
                       onChange={(e) => setRegNama(e.target.value)}
                       placeholder="Masukkan nama lengkap"
                       required
-                      style={{ width: "100%", padding: "0.6rem 0.75rem 0.6rem 2.25rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
+                      style={{ width: "100%", paddingLeft: "2.75rem !important", paddingRight: "0.75rem", paddingTop: "0.65rem", paddingBottom: "0.65rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
                     />
                   </div>
                 </div>
@@ -404,8 +409,9 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                     Buat PIN (5 Digit) *
                   </label>
                   <div style={{ position: "relative" }}>
-                    <KeyRound size={16} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
+                    <KeyRound size={18} color="#94a3b8" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
                     <input
+                      className="input-with-icon"
                       type="password"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -414,7 +420,7 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                       onChange={handleRegPinChange}
                       placeholder="Contoh: 54321"
                       required
-                      style={{ width: "100%", padding: "0.6rem 0.75rem 0.6rem 2.25rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.95rem", letterSpacing: "4px", fontWeight: "700" }}
+                      style={{ width: "100%", paddingLeft: "2.75rem !important", paddingRight: "0.75rem", paddingTop: "0.65rem", paddingBottom: "0.65rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.95rem", letterSpacing: "4px", fontWeight: "700" }}
                     />
                   </div>
                 </div>
@@ -424,13 +430,14 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                     Sekolah / Perguruan Tinggi
                   </label>
                   <div style={{ position: "relative" }}>
-                    <School size={16} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
+                    <School size={18} color="#94a3b8" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
                     <input
+                      className="input-with-icon"
                       type="text"
                       value={regSekolah}
                       onChange={(e) => setRegSekolah(e.target.value)}
                       placeholder="SMK / Universitas"
-                      style={{ width: "100%", padding: "0.6rem 0.75rem 0.6rem 2.25rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
+                      style={{ width: "100%", paddingLeft: "2.75rem !important", paddingRight: "0.75rem", paddingTop: "0.65rem", paddingBottom: "0.65rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
                     />
                   </div>
                 </div>
@@ -440,16 +447,18 @@ export default function Login({ onLoginSuccess, onOpenAdminPortal }) {
                     Nomor Handphone
                   </label>
                   <div style={{ position: "relative" }}>
-                    <Phone size={16} color="#94a3b8" style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)" }} />
+                    <Phone size={18} color="#94a3b8" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", zIndex: 5 }} />
                     <input
+                      className="input-with-icon"
                       type="text"
                       value={regNoHp}
                       onChange={(e) => setRegNoHp(e.target.value)}
                       placeholder="081234567890"
-                      style={{ width: "100%", padding: "0.6rem 0.75rem 0.6rem 2.25rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
+                      style={{ width: "100%", paddingLeft: "2.75rem !important", paddingRight: "0.75rem", paddingTop: "0.65rem", paddingBottom: "0.65rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "0.875rem" }}
                     />
                   </div>
                 </div>
+
 
                 <button
                   type="submit"

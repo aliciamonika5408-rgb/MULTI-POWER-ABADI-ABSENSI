@@ -1,29 +1,50 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Users, Printer, Download, RefreshCw } from "lucide-react";
+import { Search, Calendar, Users, Printer, FileSpreadsheet, Database, Download, X, Send } from "lucide-react";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
 import { getAttendanceRecords, getStudents } from "../services/db";
+import { sendBackupToDiscord, downloadSQLBackup, checkAndTriggerWeeklyBackup } from "../services/backupService";
+import Toast from "../components/Toast";
 
 export default function AdminDataAbsensi() {
   const [absensiList, setAbsensiList] = useState([]);
   const [siswaList, setSiswaList] = useState([]);
+  const [toast, setToast] = useState({ message: "", type: "success" });
   
   // State untuk Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSiswa, setSelectedSiswa] = useState("semua");
   const [selectedDate, setSelectedDate] = useState("");
 
-  // Load Data saat komponen dimuat
+  // State untuk Backup Modal & Discord Webhook
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState(
+    () => localStorage.getItem("discord_backup_webhook_url") || import.meta.env.VITE_DISCORD_WEBHOOK_URL || ""
+  );
+  const [isSendingBackup, setIsSendingBackup] = useState(false);
+
+  const loadData = () => {
+    const dataAbsensi = getAttendanceRecords() || [];
+    const dataSiswa = getStudents() || [];
+    setAbsensiList(dataAbsensi);
+    setSiswaList(dataSiswa);
+  };
+
   useEffect(() => {
     loadData();
+    checkAndTriggerWeeklyBackup();
+    const handleUpdate = () => loadData();
+    window.addEventListener("attendance_updated", handleUpdate);
+    window.addEventListener("users_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("attendance_updated", handleUpdate);
+      window.removeEventListener("users_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
- const loadData = () => {
-  const dataAbsensi = getAttendanceRecords() || [];
-  const dataSiswa = getStudents() || [];
-  setAbsensiList(dataAbsensi);
-  setSiswaList(dataSiswa);
-};
 
   // Logika Filter Data Absensi
   const filteredAbsensi = absensiList.filter((item) => {
@@ -34,8 +55,7 @@ export default function AdminDataAbsensi() {
       (item.ketPulang && item.ketPulang.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // 2. Filter Pilih Siswa
-    const matchSiswa =
-      selectedSiswa === "semua" || item.namaSiswa === selectedSiswa || item.siswaId === selectedSiswa;
+    const matchSiswa = selectedSiswa === "semua" || item.studentId === Number(selectedSiswa) || item.studentId === selectedSiswa;
 
     // 3. Filter Tanggal
     const matchDate = !selectedDate || item.tanggal === selectedDate;
@@ -43,10 +63,10 @@ export default function AdminDataAbsensi() {
     return matchQuery && matchSiswa && matchDate;
   });
 
-  // FUNGSI UTAMA: Cetak & Export PDF
+  // FUNGSI 1: Cetak & Export PDF
   const handleExportPDF = () => {
     if (filteredAbsensi.length === 0) {
-      alert("Tidak ada data absensi untuk dicetak!");
+      setToast({ message: "Tidak ada data absensi untuk diekspor!", type: "error" });
       return;
     }
 
@@ -73,14 +93,14 @@ export default function AdminDataAbsensi() {
       item.tanggal || "-",
       item.namaSiswa || "-",
       item.jamMasuk || "-",
-      item.ketMasuk || "-",
+      item.ketMasuk || item.keterangan || "-",
       item.jamPulang || "-",
-      item.ketPulang || "-",
+      item.ketPulang || item.keteranganPulang || "-",
       item.status || "Hadir"
     ]);
 
     // Membuat Tabel PDF dengan AutoTable
-    doc.autoTable({
+    const tableOptions = {
       startY: 37,
       head: [
         [
@@ -109,16 +129,227 @@ export default function AdminDataAbsensi() {
       alternateRowStyles: {
         fillColor: [248, 250, 252] // Warna belang tipis (#f8fafc)
       }
-    });
+    };
+
+    if (typeof autoTable === "function") {
+      autoTable(doc, tableOptions);
+    } else if (typeof doc.autoTable === "function") {
+      doc.autoTable(tableOptions);
+    }
 
     // Simpan File PDF
     doc.save(`Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.pdf`);
+    setToast({ message: "Berhasil mengunduh Laporan PDF!", type: "success" });
+  };
+
+  // FUNGSI 2: Ekspor Data ke Excel (.xlsx) Sangat Rapi, Bergaris & Berwarna Profesional
+  const handleExportExcel = async () => {
+    if (filteredAbsensi.length === 0) {
+      setToast({ message: "Tidak ada data absensi untuk diekspor!", type: "error" });
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "PT. MULTI POWER ABADI";
+      workbook.created = new Date();
+
+      const worksheet = workbook.addWorksheet("Data Absensi", {
+        views: [{ showGridLines: true }]
+      });
+
+      // 1. Atur Lebar Kolom
+      worksheet.columns = [
+        { key: "no", width: 7 },
+        { key: "tanggal", width: 15 },
+        { key: "namaSiswa", width: 34 },
+        { key: "jamMasuk", width: 14 },
+        { key: "ketMasuk", width: 34 },
+        { key: "jamPulang", width: 14 },
+        { key: "ketPulang", width: 34 },
+        { key: "status", width: 14 },
+        { key: "statusLokasi", width: 22 }
+      ];
+
+      // 2. Banner Judul Dokumen (Merged Row 1)
+      worksheet.mergeCells("A1:I1");
+      const titleCell = worksheet.getCell("A1");
+      titleCell.value = "LAPORAN PRESENSI SISWA MAGANG";
+      titleCell.font = { name: "Arial", size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      titleCell.alignment = { vertical: "middle", horizontal: "center" };
+      titleCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFDC2626" } // Warna Merah Korporat (#dc2626)
+      };
+      worksheet.getRow(1).height = 32;
+
+      // 3. Sub-Judul Perusahaan (Merged Row 2)
+      worksheet.mergeCells("A2:I2");
+      const companyCell = worksheet.getCell("A2");
+      companyCell.value = "PT. MULTI POWER ABADI";
+      companyCell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FF1E293B" } };
+      companyCell.alignment = { vertical: "middle", horizontal: "center" };
+      companyCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF1F5F9" }
+      };
+      worksheet.getRow(2).height = 20;
+
+      // 4. Metadata Tanggal Cetak & Total Data (Merged Row 3)
+      worksheet.mergeCells("A3:I3");
+      const metaCell = worksheet.getCell("A3");
+      metaCell.value = `Tanggal Ekspor: ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}  |  Total Data: ${filteredAbsensi.length} Catatan Presensi`;
+      metaCell.font = { name: "Arial", size: 9, italic: true, color: { argb: "FF64748B" } };
+      metaCell.alignment = { vertical: "middle", horizontal: "center" };
+      worksheet.getRow(3).height = 18;
+
+      // Spacing kosong baris 4
+      worksheet.getRow(4).height = 8;
+
+      // 5. Header Tabel (Baris 5)
+      const headerRow = worksheet.getRow(5);
+      headerRow.values = [
+        "No",
+        "Tanggal",
+        "Nama Siswa",
+        "Jam Masuk",
+        "Keterangan Masuk",
+        "Jam Pulang",
+        "Keterangan Pulang",
+        "Status",
+        "Lokasi Presensi"
+      ];
+      headerRow.height = 26;
+
+      headerRow.eachCell((cell) => {
+        cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF0F172A" } // Dark Slate Navy (#0f172a)
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = {
+          top: { style: "medium", color: { argb: "FF0F172A" } },
+          left: { style: "thin", color: { argb: "FF475569" } },
+          bottom: { style: "medium", color: { argb: "FF0F172A" } },
+          right: { style: "thin", color: { argb: "FF475569" } }
+        };
+      });
+
+      // Format Border Garis untuk Setiap Sel Data
+      const dataBorder = {
+        top: { style: "thin", color: { argb: "FFCBD5E1" } },
+        left: { style: "thin", color: { argb: "FFCBD5E1" } },
+        bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+        right: { style: "thin", color: { argb: "FFCBD5E1" } }
+      };
+
+      // 6. Loop Isi Baris Data
+      filteredAbsensi.forEach((item, index) => {
+        const row = worksheet.addRow([
+          index + 1,
+          item.tanggal || "-",
+          item.namaSiswa || "-",
+          item.jamMasuk || "-",
+          item.ketMasuk || item.keterangan || "-",
+          item.jamPulang || "-",
+          item.ketPulang || item.keteranganPulang || "-",
+          item.status || "Hadir",
+          item.statusLokasi || "Di Area Magang"
+        ]);
+
+        row.height = 22;
+        const isEven = index % 2 === 0;
+
+        row.eachCell((cell, colNumber) => {
+          cell.font = { name: "Arial", size: 9.5, color: { argb: "FF1E293B" } };
+          cell.border = dataBorder;
+
+          // Zebra striping latar belang-belang agar rapi dibaca
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: isEven ? "FFF8FAFC" : "FFFFFFFF" }
+          };
+
+          // Alignment sel
+          if (colNumber === 1 || colNumber === 2 || colNumber === 4 || colNumber === 6 || colNumber === 8 || colNumber === 9) {
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+          } else {
+            cell.alignment = { vertical: "middle", horizontal: "left" };
+          }
+
+          // Warna Jam Masuk (Hijau) & Jam Pulang (Merah)
+          if (colNumber === 4 && item.jamMasuk && item.jamMasuk !== "-") {
+            cell.font = { name: "Arial", size: 9.5, bold: true, color: { argb: "FF16A34A" } };
+          }
+          if (colNumber === 6 && item.jamPulang && item.jamPulang !== "-") {
+            cell.font = { name: "Arial", size: 9.5, bold: true, color: { argb: "FFDC2626" } };
+          }
+
+          // Warna Status (Hadir = Hijau, Izin = Kuning/Orange)
+          if (colNumber === 8) {
+            cell.font = {
+              name: "Arial",
+              size: 9.5,
+              bold: true,
+              color: item.status === "Izin" ? { argb: "FFD97706" } : { argb: "FF16A34A" }
+            };
+          }
+        });
+      });
+
+      // 7. Simpan dan Unduh File Excel
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      setToast({ message: "Berhasil mengunduh Laporan Excel (.xlsx) dengan format rapi!", type: "success" });
+    } catch (err) {
+      console.error("Excel Export Error:", err);
+      setToast({ message: "Gagal mengekspor file Excel!", type: "error" });
+    }
+  };
+
+  // FUNGSI 3: Kirim Backup SQL ke Discord Webhook
+  const handleSendToDiscord = async () => {
+    if (!discordWebhookUrl || !discordWebhookUrl.trim().startsWith("https://discord.com/api/webhooks/")) {
+      setToast({ message: "Masukkan URL Discord Webhook yang valid!", type: "error" });
+      return;
+    }
+
+    try {
+      setIsSendingBackup(true);
+      localStorage.setItem("discord_backup_webhook_url", discordWebhookUrl.trim());
+      await sendBackupToDiscord(discordWebhookUrl.trim());
+      setToast({ message: "🚀 Berhasil mengirim backup SQL ke channel Discord!", type: "success" });
+      setShowBackupModal(false);
+    } catch (err) {
+      console.error("Discord Backup Error:", err);
+      setToast({ message: `Gagal mengirim backup: ${err.message}`, type: "error" });
+    } finally {
+      setIsSendingBackup(false);
+    }
   };
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: "", type: "success" })}
+      />
+
       {/* Header Halaman */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#0f172a" }}>
             Data Master Absensi
@@ -128,8 +359,53 @@ export default function AdminDataAbsensi() {
           </p>
         </div>
 
-        {/* Tombol Aksi (Export PDF & Excel) */}
-        <div style={{ display: "flex", gap: "0.75rem" }}>
+        {/* Tombol Aksi (Backup, Export Excel, Export PDF) */}
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {/* Tombol Backup Database */}
+          <button
+            onClick={() => setShowBackupModal(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              backgroundColor: "#4f46e5",
+              color: "#ffffff",
+              border: "none",
+              padding: "0.6rem 1.25rem",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(79, 70, 229, 0.2)",
+              transition: "all 0.2s"
+            }}
+          >
+            <Database size={18} /> Backup Database (Discord/SQL)
+          </button>
+
+          {/* Tombol Export Excel */}
+          <button
+            onClick={handleExportExcel}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              backgroundColor: "#16a34a",
+              color: "#ffffff",
+              border: "none",
+              padding: "0.6rem 1.25rem",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(22, 163, 74, 0.2)",
+              transition: "all 0.2s"
+            }}
+          >
+            <FileSpreadsheet size={18} /> Export Excel (.xlsx)
+          </button>
+
+          {/* Tombol Export PDF */}
           <button
             onClick={handleExportPDF}
             style={{
@@ -148,7 +424,7 @@ export default function AdminDataAbsensi() {
               transition: "all 0.2s"
             }}
           >
-            <Printer size={18} /> Cetak / PDF
+            <Printer size={18} /> Export PDF
           </button>
         </div>
       </div>
@@ -198,12 +474,17 @@ export default function AdminDataAbsensi() {
               border: "1px solid #cbd5e1",
               fontSize: "0.875rem",
               outline: "none",
-              backgroundColor: "#ffffff"
+              backgroundColor: "#ffffff",
+              color: "#0f172a",
+              fontWeight: "400",
+              colorScheme: "light"
             }}
           >
-            <option value="semua">Semua Siswa Magang</option>
+            <option value="semua" style={{ color: "#0f172a", backgroundColor: "#ffffff", fontWeight: "400" }}>
+              Semua Siswa Magang
+            </option>
             {siswaList.map((s, i) => (
-              <option key={i} value={s.nama || s.namaSiswa}>
+              <option key={i} value={s.id || s.nama || s.namaSiswa} style={{ color: "#0f172a", backgroundColor: "#ffffff", fontWeight: "400" }}>
                 {s.nama || s.namaSiswa}
               </option>
             ))}
@@ -282,6 +563,202 @@ export default function AdminDataAbsensi() {
           </table>
         </div>
       </div>
+
+      {/* MODAL BACKUP DATABASE (DISCORD WEBHOOK & SQL DUMP) */}
+      {showBackupModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem"
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "1rem",
+              width: "100%",
+              maxWidth: "520px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              overflow: "hidden",
+              border: "1px solid #e2e8f0"
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "1.25rem 1.5rem",
+                borderBottom: "1px solid #f1f5f9",
+                backgroundColor: "#f8fafc"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                <div
+                  style={{
+                    backgroundColor: "#e0e7ff",
+                    color: "#4f46e5",
+                    padding: "0.5rem",
+                    borderRadius: "0.5rem",
+                    display: "flex"
+                  }}
+                >
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "#0f172a", margin: 0 }}>
+                    Backup Database
+                  </h3>
+                  <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "2px 0 0 0" }}>
+                    Kirim berkas cadangan .SQL ke Discord Webhook atau unduh ke komputer
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBackupModal(false)}
+                style={{
+                  border: "none",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "0.25rem",
+                  borderRadius: "0.375rem"
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "1.5rem" }}>
+              {/* Ringkasan Data */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "0.75rem",
+                  marginBottom: "1.25rem"
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e2e8f0"
+                  }}
+                >
+                  <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>Total Akun / Siswa</span>
+                  <p style={{ fontSize: "1.125rem", fontWeight: "800", color: "#0f172a", margin: "4px 0 0 0" }}>
+                    {siswaList.length} Siswa
+                  </p>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: "#f8fafc",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e2e8f0"
+                  }}
+                >
+                  <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "600" }}>Total Catatan Presensi</span>
+                  <p style={{ fontSize: "1.125rem", fontWeight: "800", color: "#0f172a", margin: "4px 0 0 0" }}>
+                    {absensiList.length} Catatan
+                  </p>
+                </div>
+              </div>
+
+              {/* Input Discord Webhook */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "700", color: "#334155", marginBottom: "0.5rem" }}>
+                  Discord Webhook URL
+                </label>
+                <input
+                  type="text"
+                  value={discordWebhookUrl}
+                  onChange={(e) => setDiscordWebhookUrl(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/..."
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "0.825rem",
+                    outline: "none",
+                    boxSizing: "border-box"
+                  }}
+                />
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "4px" }}>
+                  URL ini akan otomatis disimpan di browser Anda untuk backup selanjutnya.
+                </p>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {/* Tombol Kirim ke Discord */}
+                <button
+                  onClick={handleSendToDiscord}
+                  disabled={isSendingBackup}
+                  style={{
+                    width: "100%",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    backgroundColor: isSendingBackup ? "#94a3b8" : "#5865F2", // Discord Blurple
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    fontWeight: "700",
+                    cursor: isSendingBackup ? "not-allowed" : "pointer",
+                    boxShadow: "0 2px 4px rgba(88, 101, 242, 0.25)"
+                  }}
+                >
+                  <Send size={18} /> {isSendingBackup ? "Sedang Mengirim ke Discord..." : "Kirim Backup .SQL ke Discord"}
+                </button>
+
+                {/* Tombol Unduh SQL Manual */}
+                <button
+                  onClick={() => {
+                    downloadSQLBackup();
+                    setToast({ message: "File .SQL berhasil diunduh ke komputer!", type: "success" });
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.5rem",
+                    backgroundColor: "#f1f5f9",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    padding: "0.65rem 1rem",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Download size={18} /> Unduh File .SQL ke Laptop
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}
