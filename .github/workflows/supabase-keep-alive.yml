@@ -1,0 +1,42 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Berjalan setiap 3 hari sekali pada jam 00:00 UTC (07:00 WIB)
+    - cron: '0 0 */3 * *'
+  # Memungkinkan untuk dijalankan secara manual melalui tombol "Run workflow" di GitHub
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase API & Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL atau SUPABASE_ANON_KEY belum diisi di GitHub Secrets!"
+            exit 1
+          fi
+
+          # Bersihkan trailing slash pada URL jika ada
+          CLEAN_URL="${SUPABASE_URL%/}"
+
+          echo "Mengirim ping ke database Supabase (${CLEAN_URL}/rest/v1/users?select=id&limit=1) ..."
+          
+          # Kirim request HTTP GET ke endpoint REST Supabase untuk memicu query database
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${CLEAN_URL}/rest/v1/users?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          echo "HTTP Response Status: $HTTP_STATUS"
+
+          # Status 200 OK berarti database Supabase aktif & sukses query
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Berhasil! Database Supabase aktif, query sukses dijalankan, dan auto-pause berhasil dicegah."
+          else
+            echo "::warning::Response code: $HTTP_STATUS (Request tetap terkirim sebagai aktivitas di Supabase)."
+          fi
