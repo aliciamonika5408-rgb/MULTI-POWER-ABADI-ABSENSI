@@ -1,6 +1,5 @@
 import initialData from "../data/database.json";
 import { supabase } from "./supabase";
-import { checkAndTriggerWeeklyBackup } from "./backupService";
 
 // Initial Database Records from src/data/database.json
 const INITIAL_STUDENTS = initialData.students;
@@ -153,9 +152,6 @@ export const fetchCloudDB = async () => {
       } catch (e) {}
       updated = true;
     }
-
-    // Cek jadwal auto backup 7 hari sekali ke Discord
-    checkAndTriggerWeeklyBackup();
 
     return updated;
   } catch (e) {

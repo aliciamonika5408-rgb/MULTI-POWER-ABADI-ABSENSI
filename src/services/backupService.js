@@ -237,25 +237,52 @@ export const sendBackupToDiscord = async (customWebhookUrl = null, isScheduled =
   return true;
 };
 
+// Lock Mutex di memori untuk mencegah duplicate network calls
+let isBackupInProgress = false;
+
 /**
  * Pengecekan Jadwal Otomatis 7 Hari Sekali (Weekly Auto-Backup)
+ * Dilengkapi Anti-Duplikasi (Mutex Lock + Session Guard)
  */
 export const checkAndTriggerWeeklyBackup = async () => {
+  if (isBackupInProgress) return false;
+
+  // Cek guard per-sesi tab browser (hanya cek 1x per sesi)
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    if (sessionStorage.getItem("auto_backup_checked_this_session")) {
+      return false;
+    }
+    sessionStorage.setItem("auto_backup_checked_this_session", "true");
+  }
+
   try {
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
     const lastBackup = localStorage.getItem("last_weekly_backup_timestamp");
     const now = Date.now();
 
-    if (!lastBackup || (now - Number(lastBackup)) >= SEVEN_DAYS_MS) {
+    // Jika belum pernah diset sama sekali, inisialisasi timestamp sekarang agar tidak spam saat pertama buka
+    if (!lastBackup) {
+      localStorage.setItem("last_weekly_backup_timestamp", now.toString());
+      return false;
+    }
+
+    // Jika sudah lewat >= 7 hari
+    if ((now - Number(lastBackup)) >= SEVEN_DAYS_MS) {
+      isBackupInProgress = true;
+      // Optimistic lock: Segera perbarui timestamp sebelum request jalan agar tidak ter-trigger ganda
+      localStorage.setItem("last_weekly_backup_timestamp", now.toString());
+
       console.log("⏰ Menjalankan auto-backup database 7 harian ke Discord...");
       await sendBackupToDiscord(null, true);
-      localStorage.setItem("last_weekly_backup_timestamp", now.toString());
+      isBackupInProgress = false;
       return true;
     }
     return false;
   } catch (e) {
     console.warn("Auto weekly backup notice:", e);
+    isBackupInProgress = false;
     return false;
   }
 };
+
 

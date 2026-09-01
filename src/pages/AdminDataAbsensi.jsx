@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import { getAttendanceRecords, getStudents } from "../services/db";
-import { sendBackupToDiscord, downloadSQLBackup } from "../services/backupService";
+import { sendBackupToDiscord, downloadSQLBackup, checkAndTriggerWeeklyBackup } from "../services/backupService";
 import Toast from "../components/Toast";
 
 export default function AdminDataAbsensi() {
@@ -33,6 +33,7 @@ export default function AdminDataAbsensi() {
 
   useEffect(() => {
     loadData();
+    checkAndTriggerWeeklyBackup();
     const handleUpdate = () => loadData();
     window.addEventListener("attendance_updated", handleUpdate);
     window.addEventListener("users_updated", handleUpdate);
