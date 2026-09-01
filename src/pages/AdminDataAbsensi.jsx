@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Users, Printer, Download, RefreshCw } from "lucide-react";
+import { Search, Calendar, Users, Printer, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
 import { getAttendanceRecords, getStudents } from "../services/db";
 import Toast from "../components/Toast";
 
@@ -53,10 +54,10 @@ export default function AdminDataAbsensi() {
     return matchQuery && matchSiswa && matchDate;
   });
 
-  // FUNGSI UTAMA: Cetak & Export PDF
+  // FUNGSI 1: Cetak & Export PDF
   const handleExportPDF = () => {
     if (filteredAbsensi.length === 0) {
-      setToast({ message: "Tidak ada data absensi untuk dicetak!", type: "error" });
+      setToast({ message: "Tidak ada data absensi untuk diekspor!", type: "error" });
       return;
     }
 
@@ -83,9 +84,9 @@ export default function AdminDataAbsensi() {
       item.tanggal || "-",
       item.namaSiswa || "-",
       item.jamMasuk || "-",
-      item.ketMasuk || "-",
+      item.ketMasuk || item.keterangan || "-",
       item.jamPulang || "-",
-      item.ketPulang || "-",
+      item.ketPulang || item.keteranganPulang || "-",
       item.status || "Hadir"
     ]);
 
@@ -129,6 +130,184 @@ export default function AdminDataAbsensi() {
 
     // Simpan File PDF
     doc.save(`Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.pdf`);
+    setToast({ message: "Berhasil mengunduh Laporan PDF!", type: "success" });
+  };
+
+  // FUNGSI 2: Ekspor Data ke Excel (.xlsx) Sangat Rapi, Bergaris & Berwarna Profesional
+  const handleExportExcel = async () => {
+    if (filteredAbsensi.length === 0) {
+      setToast({ message: "Tidak ada data absensi untuk diekspor!", type: "error" });
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "PT. MULTI POWER ABADI";
+      workbook.created = new Date();
+
+      const worksheet = workbook.addWorksheet("Data Absensi", {
+        views: [{ showGridLines: true }]
+      });
+
+      // 1. Atur Lebar Kolom
+      worksheet.columns = [
+        { key: "no", width: 7 },
+        { key: "tanggal", width: 15 },
+        { key: "namaSiswa", width: 34 },
+        { key: "jamMasuk", width: 14 },
+        { key: "ketMasuk", width: 34 },
+        { key: "jamPulang", width: 14 },
+        { key: "ketPulang", width: 34 },
+        { key: "status", width: 14 },
+        { key: "statusLokasi", width: 22 }
+      ];
+
+      // 2. Banner Judul Dokumen (Merged Row 1)
+      worksheet.mergeCells("A1:I1");
+      const titleCell = worksheet.getCell("A1");
+      titleCell.value = "LAPORAN PRESENSI SISWA MAGANG";
+      titleCell.font = { name: "Arial", size: 14, bold: true, color: { argb: "FFFFFFFF" } };
+      titleCell.alignment = { vertical: "middle", horizontal: "center" };
+      titleCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFDC2626" } // Warna Merah Korporat (#dc2626)
+      };
+      worksheet.getRow(1).height = 32;
+
+      // 3. Sub-Judul Perusahaan (Merged Row 2)
+      worksheet.mergeCells("A2:I2");
+      const companyCell = worksheet.getCell("A2");
+      companyCell.value = "PT. MULTI POWER ABADI";
+      companyCell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FF1E293B" } };
+      companyCell.alignment = { vertical: "middle", horizontal: "center" };
+      companyCell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF1F5F9" }
+      };
+      worksheet.getRow(2).height = 20;
+
+      // 4. Metadata Tanggal Cetak & Total Data (Merged Row 3)
+      worksheet.mergeCells("A3:I3");
+      const metaCell = worksheet.getCell("A3");
+      metaCell.value = `Tanggal Ekspor: ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}  |  Total Data: ${filteredAbsensi.length} Catatan Presensi`;
+      metaCell.font = { name: "Arial", size: 9, italic: true, color: { argb: "FF64748B" } };
+      metaCell.alignment = { vertical: "middle", horizontal: "center" };
+      worksheet.getRow(3).height = 18;
+
+      // Spacing kosong baris 4
+      worksheet.getRow(4).height = 8;
+
+      // 5. Header Tabel (Baris 5)
+      const headerRow = worksheet.getRow(5);
+      headerRow.values = [
+        "No",
+        "Tanggal",
+        "Nama Siswa",
+        "Jam Masuk",
+        "Keterangan Masuk",
+        "Jam Pulang",
+        "Keterangan Pulang",
+        "Status",
+        "Lokasi Presensi"
+      ];
+      headerRow.height = 26;
+
+      headerRow.eachCell((cell) => {
+        cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF0F172A" } // Dark Slate Navy (#0f172a)
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = {
+          top: { style: "medium", color: { argb: "FF0F172A" } },
+          left: { style: "thin", color: { argb: "FF475569" } },
+          bottom: { style: "medium", color: { argb: "FF0F172A" } },
+          right: { style: "thin", color: { argb: "FF475569" } }
+        };
+      });
+
+      // Format Border Garis untuk Setiap Sel Data
+      const dataBorder = {
+        top: { style: "thin", color: { argb: "FFCBD5E1" } },
+        left: { style: "thin", color: { argb: "FFCBD5E1" } },
+        bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+        right: { style: "thin", color: { argb: "FFCBD5E1" } }
+      };
+
+      // 6. Loop Isi Baris Data
+      filteredAbsensi.forEach((item, index) => {
+        const row = worksheet.addRow([
+          index + 1,
+          item.tanggal || "-",
+          item.namaSiswa || "-",
+          item.jamMasuk || "-",
+          item.ketMasuk || item.keterangan || "-",
+          item.jamPulang || "-",
+          item.ketPulang || item.keteranganPulang || "-",
+          item.status || "Hadir",
+          item.statusLokasi || "Di Area Magang"
+        ]);
+
+        row.height = 22;
+        const isEven = index % 2 === 0;
+
+        row.eachCell((cell, colNumber) => {
+          cell.font = { name: "Arial", size: 9.5, color: { argb: "FF1E293B" } };
+          cell.border = dataBorder;
+
+          // Zebra striping latar belang-belang agar rapi dibaca
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: isEven ? "FFF8FAFC" : "FFFFFFFF" }
+          };
+
+          // Alignment sel
+          if (colNumber === 1 || colNumber === 2 || colNumber === 4 || colNumber === 6 || colNumber === 8 || colNumber === 9) {
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+          } else {
+            cell.alignment = { vertical: "middle", horizontal: "left" };
+          }
+
+          // Warna Jam Masuk (Hijau) & Jam Pulang (Merah)
+          if (colNumber === 4 && item.jamMasuk && item.jamMasuk !== "-") {
+            cell.font = { name: "Arial", size: 9.5, bold: true, color: { argb: "FF16A34A" } };
+          }
+          if (colNumber === 6 && item.jamPulang && item.jamPulang !== "-") {
+            cell.font = { name: "Arial", size: 9.5, bold: true, color: { argb: "FFDC2626" } };
+          }
+
+          // Warna Status (Hadir = Hijau, Izin = Kuning/Orange)
+          if (colNumber === 8) {
+            cell.font = {
+              name: "Arial",
+              size: 9.5,
+              bold: true,
+              color: item.status === "Izin" ? { argb: "FFD97706" } : { argb: "FF16A34A" }
+            };
+          }
+        });
+      });
+
+      // 7. Simpan dan Unduh File Excel
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Laporan_Absensi_Magang_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      setToast({ message: "Berhasil mengunduh Laporan Excel (.xlsx) dengan format rapi!", type: "success" });
+    } catch (err) {
+      console.error("Excel Export Error:", err);
+      setToast({ message: "Gagal mengekspor file Excel!", type: "error" });
+    }
   };
 
   return (
@@ -139,7 +318,7 @@ export default function AdminDataAbsensi() {
         onClose={() => setToast({ message: "", type: "success" })}
       />
       {/* Header Halaman */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#0f172a" }}>
             Data Master Absensi
@@ -150,7 +329,30 @@ export default function AdminDataAbsensi() {
         </div>
 
         {/* Tombol Aksi (Export PDF & Excel) */}
-        <div style={{ display: "flex", gap: "0.75rem" }}>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {/* Tombol Export Excel */}
+          <button
+            onClick={handleExportExcel}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              backgroundColor: "#16a34a",
+              color: "#ffffff",
+              border: "none",
+              padding: "0.6rem 1.25rem",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(22, 163, 74, 0.2)",
+              transition: "all 0.2s"
+            }}
+          >
+            <FileSpreadsheet size={18} /> Export Excel (.xlsx)
+          </button>
+
+          {/* Tombol Export PDF */}
           <button
             onClick={handleExportPDF}
             style={{
@@ -169,7 +371,7 @@ export default function AdminDataAbsensi() {
               transition: "all 0.2s"
             }}
           >
-            <Printer size={18} /> Cetak / PDF
+            <Printer size={18} /> Export PDF
           </button>
         </div>
       </div>
