@@ -1,4 +1,4 @@
-name: Supabase Keep-Alive Ping
+name: Supabase Keep-Alive + Auto Backup
 
 on:
   schedule:
@@ -8,35 +8,172 @@ on:
   workflow_dispatch:
 
 jobs:
-  ping-supabase:
-    name: Ping Supabase API & Database
+  keep-alive-and-backup:
+    name: Keep-Alive Ping + SQL Backup to Discord
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Ping Supabase & Backup Database to Discord
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
+          set -e
+
+          # ============================================================
+          # STEP 1: Validasi Secret
+          # ============================================================
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "::error::SUPABASE_URL atau SUPABASE_ANON_KEY belum diisi di GitHub Secrets!"
             exit 1
           fi
 
-          # Bersihkan trailing slash pada URL jika ada
           CLEAN_URL="${SUPABASE_URL%/}"
+          DATE_STR=$(date -u +"%Y-%m-%d")
+          TIME_STR=$(TZ="Asia/Jakarta" date +"%H:%M:%S")
 
-          echo "Mengirim ping ke database Supabase (${CLEAN_URL}/rest/v1/users?select=id&limit=1) ..."
-          
-          # Kirim request HTTP GET ke endpoint REST Supabase untuk memicu query database
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${CLEAN_URL}/rest/v1/users?select=id&limit=1" \
+          # ============================================================
+          # STEP 2: KEEP-ALIVE PING - Query database supaya tidak pause
+          # ============================================================
+          echo "🏓 [KEEP-ALIVE] Mengirim ping ke Supabase..."
+
+          PING_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${CLEAN_URL}/rest/v1/users?select=id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
 
-          echo "HTTP Response Status: $HTTP_STATUS"
+          echo "🏓 Keep-Alive Ping Response: HTTP $PING_STATUS"
 
-          # Status 200 OK berarti database Supabase aktif & sukses query
-          if [ "$HTTP_STATUS" -eq 200 ]; then
-            echo "✅ Berhasil! Database Supabase aktif, query sukses dijalankan, dan auto-pause berhasil dicegah."
+          if [ "$PING_STATUS" -eq 200 ]; then
+            PING_RESULT="✅ Berhasil (HTTP 200 OK)"
+            echo "✅ Database Supabase aktif! Auto-pause berhasil dicegah."
           else
-            echo "::warning::Response code: $HTTP_STATUS (Request tetap terkirim sebagai aktivitas di Supabase)."
+            PING_RESULT="⚠️ Warning (HTTP $PING_STATUS)"
+            echo "::warning::Keep-alive ping mendapat response $PING_STATUS"
           fi
+
+          # ============================================================
+          # STEP 3: FETCH DATA untuk SQL Backup
+          # ============================================================
+          echo "📥 Mengambil data dari Supabase untuk backup..."
+
+          USERS=$(curl -s -X GET "${CLEAN_URL}/rest/v1/users?select=*" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          ABSENSI=$(curl -s -X GET "${CLEAN_URL}/rest/v1/absensi?select=*" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          USER_COUNT=$(echo "$USERS" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data))" 2>/dev/null || echo "0")
+          ABSENSI_COUNT=$(echo "$ABSENSI" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data))" 2>/dev/null || echo "0")
+
+          echo "📊 Data: ${USER_COUNT} users, ${ABSENSI_COUNT} absensi records"
+
+          # ============================================================
+          # STEP 4: Generate SQL Backup File
+          # ============================================================
+          FILENAME="backup_keepalive_${DATE_STR}.sql"
+
+          export USERS ABSENSI DATE_STR FILENAME
+          python3 << 'PYEOF'
+          import json, os
+
+          users_json = os.environ.get("USERS", "[]")
+          absensi_json = os.environ.get("ABSENSI", "[]")
+          date_str = os.environ.get("DATE_STR", "unknown")
+          filename = os.environ.get("FILENAME", "backup.sql")
+
+          try:
+              users = json.loads(users_json)
+          except:
+              users = []
+          try:
+              absensi = json.loads(absensi_json)
+          except:
+              absensi = []
+
+          def esc(val):
+              if val is None:
+                  return ""
+              return str(val).replace("'", "''")
+
+          sql = f"-- KEEP-ALIVE AUTO BACKUP (setiap 3 hari)\n"
+          sql += f"-- Date: {date_str}\n"
+          sql += f"-- Generated by GitHub Actions Keep-Alive + Backup Workflow\n"
+          sql += f"-- Users: {len(users)}, Absensi: {len(absensi)}\n\n"
+
+          if users:
+              sql += "-- USERS TABLE\n"
+              sql += "INSERT INTO users (id, nama, pin, role, sekolah, tempat_magang, no_hp, foto_profil) VALUES\n"
+              vals = []
+              for u in users:
+                  vals.append(f"('{esc(u.get('id'))}', '{esc(u.get('nama'))}', '{esc(u.get('pin'))}', '{esc(u.get('role'))}', '{esc(u.get('sekolah'))}', '{esc(u.get('tempat_magang'))}', '{esc(u.get('no_hp'))}', '{esc(u.get('foto_profil'))}')")
+              sql += ",\n".join(vals) + "\nON CONFLICT (id) DO NOTHING;\n\n"
+
+          if absensi:
+              sql += "-- ABSENSI TABLE\n"
+              sql += "INSERT INTO absensi (id, student_id, nama_siswa, tanggal, jam_masuk, keterangan_masuk, jam_pulang, keterangan_pulang, status, latitude, longitude, jarak_meters, status_lokasi) VALUES\n"
+              vals = []
+              for a in absensi:
+                  lat = a.get('latitude') or 'NULL'
+                  lng = a.get('longitude') or 'NULL'
+                  jarak = a.get('jarak_meters') or 0
+                  vals.append(f"('{esc(a.get('id'))}', '{esc(a.get('student_id'))}', '{esc(a.get('nama_siswa'))}', '{esc(a.get('tanggal'))}', '{esc(a.get('jam_masuk','-'))}', '{esc(a.get('keterangan_masuk','-'))}', '{esc(a.get('jam_pulang','-'))}', '{esc(a.get('keterangan_pulang','-'))}', '{esc(a.get('status','Hadir'))}', {lat}, {lng}, {jarak}, '{esc(a.get('status_lokasi','Di Area Magang'))}')")
+              sql += ",\n".join(vals) + "\nON CONFLICT (id) DO NOTHING;\n\n"
+
+          with open(filename, "w", encoding="utf-8") as f:
+              f.write(sql)
+
+          print(f"📄 SQL backup file created: {filename} ({len(sql)} bytes)")
+          PYEOF
+
+          # ============================================================
+          # STEP 5: Kirim Notifikasi + Backup ke Discord
+          # ============================================================
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "⚠️ DISCORD_WEBHOOK_URL belum diisi. Skip kirim ke Discord, tapi keep-alive tetap berhasil."
+            echo "✅ Keep-Alive selesai tanpa notifikasi Discord."
+            exit 0
+          fi
+
+          echo "📤 Mengirim notifikasi + backup ke Discord..."
+
+          PAYLOAD_JSON=$(python3 -c "
+          import json
+          payload = {
+              'content': '🏓 **[KEEP-ALIVE] Supabase Auto Keep-Alive + Backup (Setiap 3 Hari)**',
+              'embeds': [{
+                  'title': '🛡️ Keep-Alive & Auto Backup - PT. Multi Power Abadi',
+                  'description': 'Supabase berhasil di-ping untuk mencegah auto-pause. File backup SQL juga terlampir sebagai cadangan.',
+                  'color': 3066993,
+                  'fields': [
+                      {'name': '🏓 Keep-Alive Status', 'value': '${PING_RESULT}', 'inline': True},
+                      {'name': '📅 Waktu Eksekusi', 'value': '${DATE_STR} ${TIME_STR} WIB', 'inline': True},
+                      {'name': '👥 Total Siswa', 'value': '${USER_COUNT} Siswa', 'inline': True},
+                      {'name': '📝 Total Absensi', 'value': '${ABSENSI_COUNT} Catatan', 'inline': True},
+                      {'name': '⏰ Jadwal Berikutnya', 'value': 'Otomatis 3 hari lagi', 'inline': True},
+                      {'name': '🤖 Trigger', 'value': 'GitHub Actions Cron (3 Hari)', 'inline': True}
+                  ],
+                  'footer': {'text': '🛡️ Supabase Keep-Alive + Auto Backup • PT. Multi Power Abadi'}
+              }]
+          }
+          print(json.dumps(payload))
+          ")
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -F "files[0]=@${FILENAME}" \
+            -F "payload_json=${PAYLOAD_JSON}" \
+            "${DISCORD_WEBHOOK_URL}")
+
+          echo "Discord webhook response: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 204 ]; then
+            echo "✅ Notifikasi keep-alive + backup SQL berhasil dikirim ke Discord!"
+          else
+            echo "::warning::Discord webhook response: $HTTP_STATUS (keep-alive tetap berhasil, hanya notifikasi gagal)"
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "✅ SELESAI: Keep-Alive + Backup Complete!"
+          echo "========================================="
