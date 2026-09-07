@@ -298,5 +298,3 @@ export const checkAndTriggerWeeklyBackup = async () => {
     return false;
   }
 };
-
-
