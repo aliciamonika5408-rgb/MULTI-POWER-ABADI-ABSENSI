@@ -21,14 +21,28 @@ jobs:
           set -e
 
           # ============================================================
-          # STEP 1: Validasi Secret
+          # STEP 1: Konfigurasi & Auto-Redirect ke Database Aktif
           # ============================================================
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::SUPABASE_URL atau SUPABASE_ANON_KEY belum diisi di GitHub Secrets!"
-            exit 1
+          DEFAULT_SUPABASE_URL="https://ncxcmzuqhndzuzbskfxf.supabase.co"
+          DEFAULT_SUPABASE_ANON_KEY="sb_publishable_kM4a_hsiZ9Xm6X90r4ILGQ_BaWZIG_S"
+          DEFAULT_DISCORD_WEBHOOK="https://discord.com/api/webhooks/1544258389444657196/0izuw-4rftmFy2EpQ4Yv8TJaVzSf85yLsg8R_fD59NAX382B1vcBLg6-Y1B7iwvbTc4X"
+
+          TARGET_URL="${SUPABASE_URL:-$DEFAULT_SUPABASE_URL}"
+          TARGET_KEY="${SUPABASE_ANON_KEY:-$DEFAULT_SUPABASE_ANON_KEY}"
+          TARGET_DISCORD="${DISCORD_WEBHOOK_URL:-$DEFAULT_DISCORD_WEBHOOK}"
+
+          # Jika secret lama 'apwhrrblwnhpltixqxye' masih tersimpan di GitHub Secrets, otomatis arahkan ke database aktif
+          if [[ "$TARGET_URL" == *"apwhrrblwnhpltixqxye"* ]]; then
+            echo "⚠️ Terdeteksi project lama (apwhrrblwnhpltixqxye). Mengalihkan otomatis ke project Supabase aktif (ncxcmzuqhndzuzbskfxf)..."
+            TARGET_URL="$DEFAULT_SUPABASE_URL"
+            TARGET_KEY="$DEFAULT_SUPABASE_ANON_KEY"
           fi
 
-          CLEAN_URL="${SUPABASE_URL%/}"
+          if [[ "$TARGET_KEY" == *"tfhsgx3BOYkqzhYzjhN4Kg"* ]]; then
+            TARGET_KEY="$DEFAULT_SUPABASE_ANON_KEY"
+          fi
+
+          CLEAN_URL="${TARGET_URL%/}"
           DATE_STR=$(date -u +"%Y-%m-%d")
           TIME_STR=$(TZ="Asia/Jakarta" date +"%H:%M:%S")
           ISO_NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -36,11 +50,11 @@ jobs:
           # ============================================================
           # STEP 2: KEEP-ALIVE PING - Query database supaya tidak pause
           # ============================================================
-          echo "🏓 [KEEP-ALIVE] Mengirim ping ke Supabase..."
+          echo "🏓 [KEEP-ALIVE] Mengirim ping ke Supabase (${CLEAN_URL})..."
 
           PING_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${CLEAN_URL}/rest/v1/users?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+            -H "apikey: ${TARGET_KEY}" \
+            -H "Authorization: Bearer ${TARGET_KEY}")
 
           echo "🏓 Keep-Alive Ping Response: HTTP $PING_STATUS"
 
@@ -57,43 +71,54 @@ jobs:
           fi
 
           # ============================================================
-          # STEP 3: FETCH DATA untuk SQL Backup
+          # STEP 3: FETCH DATA LENGKAP untuk SQL Backup
           # ============================================================
-          echo "📥 Mengambil data dari Supabase untuk backup..."
+          echo "📥 Mengambil data lengkap dari Supabase untuk backup..."
 
-          USERS=$(curl -s -X GET "${CLEAN_URL}/rest/v1/users?select=*" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          PERUSAHAAN=$(curl -s -X GET "${CLEAN_URL}/rest/v1/perusahaan?select=*" \
+            -H "apikey: ${TARGET_KEY}" \
+            -H "Authorization: Bearer ${TARGET_KEY}")
 
-          ABSENSI=$(curl -s -X GET "${CLEAN_URL}/rest/v1/absensi?select=*" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          USERS=$(curl -s -X GET "${CLEAN_URL}/rest/v1/users?select=*&limit=10000" \
+            -H "apikey: ${TARGET_KEY}" \
+            -H "Authorization: Bearer ${TARGET_KEY}")
+
+          ABSENSI=$(curl -s -X GET "${CLEAN_URL}/rest/v1/absensi?select=*&order=tanggal.desc&limit=10000" \
+            -H "apikey: ${TARGET_KEY}" \
+            -H "Authorization: Bearer ${TARGET_KEY}")
 
           USER_COUNT=$(echo "$USERS" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data))" 2>/dev/null || echo "0")
           ABSENSI_COUNT=$(echo "$ABSENSI" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data))" 2>/dev/null || echo "0")
 
-          echo "📊 Data: ${USER_COUNT} users, ${ABSENSI_COUNT} absensi records"
+          echo "📊 Data fetched: ${USER_COUNT} users, ${ABSENSI_COUNT} absensi records"
 
           # ============================================================
-          # STEP 4: Generate SQL Backup File
+          # STEP 4: Generate SQL Backup Lengkap (Standar Sistem)
           # ============================================================
           FILENAME="backup_keepalive_${DATE_STR}.sql"
 
-          export USERS ABSENSI DATE_STR FILENAME
+          export PERUSAHAAN USERS ABSENSI ISO_NOW FILENAME
           python3 << 'PYEOF'
           import json, os
 
-          users_json = os.environ.get("USERS", "[]")
-          absensi_json = os.environ.get("ABSENSI", "[]")
-          date_str = os.environ.get("DATE_STR", "unknown")
+          perusahaan_raw = os.environ.get("PERUSAHAAN", "[]")
+          users_raw = os.environ.get("USERS", "[]")
+          absensi_raw = os.environ.get("ABSENSI", "[]")
+          iso_now = os.environ.get("ISO_NOW", "")
           filename = os.environ.get("FILENAME", "backup.sql")
 
           try:
-              users = json.loads(users_json)
+              perusahaan_list = json.loads(perusahaan_raw)
+          except:
+              perusahaan_list = []
+
+          try:
+              users = json.loads(users_raw)
           except:
               users = []
+
           try:
-              absensi = json.loads(absensi_json)
+              absensi = json.loads(absensi_raw)
           except:
               absensi = []
 
@@ -103,47 +128,136 @@ jobs:
               return str(val).replace("'", "''")
 
           sql = f"-- =========================================================\n"
-          sql += f"-- DATABASE KEEP-ALIVE CADANGAN (Multi Power Abadi)\n"
-          sql += f"-- Waktu Eksekusi : {date_str}\n"
-          sql += f"-- Total Siswa    : {len(users)} Akun\n"
-          sql += f"-- Total Presensi : {len(absensi)} Data\n"
-          sql += f"-- Dibuat secara otomatis oleh GitHub Actions Cron\n"
+          sql += f"-- DATABASE BACKUP: Multi Power Abadi Absensi Magang\n"
+          sql += f"-- Tanggal Dibuat: {iso_now}\n"
+          sql += f"-- Total Users   : {len(users)} Akun\n"
+          sql += f"-- Total Absensi : {len(absensi)} Baris Data\n"
+          sql += f"-- Dibuat secara otomatis oleh GitHub Actions (Keep-Alive Cron)\n"
           sql += f"-- =========================================================\n\n"
 
+          # 1. Tabel Perusahaan
+          sql += f"-- 1. Tabel Perusahaan\n"
+          sql += f"CREATE TABLE IF NOT EXISTS perusahaan (\n"
+          sql += f"  id SERIAL PRIMARY KEY,\n"
+          sql += f"  nama_perusahaan VARCHAR(150) NOT NULL,\n"
+          sql += f"  alamat TEXT NOT NULL,\n"
+          sql += f"  latitude NUMERIC(10,8) NOT NULL,\n"
+          sql += f"  longitude NUMERIC(11,8) NOT NULL,\n"
+          sql += f"  radius_max_meters INT NOT NULL DEFAULT 200,\n"
+          sql += f"  no_wa_pembimbing VARCHAR(20) NOT NULL\n"
+          sql += f");\n\n"
+
+          comp = perusahaan_list[0] if (isinstance(perusahaan_list, list) and len(perusahaan_list) > 0) else {}
+          comp_name = esc(comp.get("nama_perusahaan", "PT. MULTI POWER ABADI"))
+          comp_addr = esc(comp.get("alamat", "Jl. Gn. Anyar Tambak IV No.50, Gn. Anyar Tambak, Kec. Gn. Anyar, Surabaya, Jawa Timur 60294"))
+          comp_lat = comp.get("latitude", -7.344001)
+          comp_lng = comp.get("longitude", 112.804846)
+          comp_radius = comp.get("radius_max_meters", 200)
+          comp_wa = esc(comp.get("no_wa_pembimbing", "6288996838093"))
+
+          sql += f"INSERT INTO perusahaan (id, nama_perusahaan, alamat, latitude, longitude, radius_max_meters, no_wa_pembimbing)\n"
+          sql += f"VALUES (1, '{comp_name}', '{comp_addr}', {comp_lat}, {comp_lng}, {comp_radius}, '{comp_wa}')\n"
+          sql += f"ON CONFLICT (id) DO UPDATE SET\n"
+          sql += f"  nama_perusahaan = EXCLUDED.nama_perusahaan,\n"
+          sql += f"  alamat = EXCLUDED.alamat,\n"
+          sql += f"  latitude = EXCLUDED.latitude,\n"
+          sql += f"  longitude = EXCLUDED.longitude,\n"
+          sql += f"  radius_max_meters = EXCLUDED.radius_max_meters,\n"
+          sql += f"  no_wa_pembimbing = EXCLUDED.no_wa_pembimbing;\n\n"
+
+          # 2. Tabel Users
+          sql += f"-- 2. Tabel Users (Admin & Siswa Magang)\n"
+          sql += f"CREATE TABLE IF NOT EXISTS users (\n"
+          sql += f"  id VARCHAR(50) PRIMARY KEY,\n"
+          sql += f"  nama VARCHAR(150) NOT NULL,\n"
+          sql += f"  pin VARCHAR(10) UNIQUE NOT NULL,\n"
+          sql += f"  role VARCHAR(20) NOT NULL DEFAULT 'siswa',\n"
+          sql += f"  sekolah VARCHAR(150),\n"
+          sql += f"  tempat_magang VARCHAR(150) DEFAULT 'PT. MULTI POWER ABADI',\n"
+          sql += f"  no_hp VARCHAR(20),\n"
+          sql += f"  foto_profil VARCHAR(255) DEFAULT '/default-avatar.png',\n"
+          sql += f"  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n"
+          sql += f");\n\n"
+
           if users:
-              sql += "-- TABEL USERS\n"
-              sql += "INSERT INTO users (id, nama, pin, role, sekolah, tempat_magang, no_hp, foto_profil) VALUES\n"
-              vals = []
+              sql += f"-- Insert Data Users\n"
+              sql += f"INSERT INTO users (id, nama, pin, role, sekolah, tempat_magang, no_hp, foto_profil) VALUES\n"
+              user_vals = []
               for u in users:
-                  vals.append(f"('{esc(u.get('id'))}', '{esc(u.get('nama'))}', '{esc(u.get('pin'))}', '{esc(u.get('role'))}', '{esc(u.get('sekolah'))}', '{esc(u.get('tempat_magang'))}', '{esc(u.get('no_hp'))}', '{esc(u.get('foto_profil'))}')")
-              sql += ",\n".join(vals) + "\nON CONFLICT (id) DO NOTHING;\n\n"
+                  u_id = esc(u.get("id"))
+                  u_nama = esc(u.get("nama"))
+                  u_pin = esc(u.get("pin"))
+                  u_role = esc(u.get("role", "siswa"))
+                  u_sekolah = esc(u.get("sekolah", ""))
+                  u_magang = esc(u.get("tempat_magang", "PT. MULTI POWER ABADI"))
+                  u_hp = esc(u.get("no_hp", ""))
+                  u_foto = esc(u.get("foto_profil", "/default-avatar.png"))
+                  user_vals.append(f"('{u_id}', '{u_nama}', '{u_pin}', '{u_role}', '{u_sekolah}', '{u_magang}', '{u_hp}', '{u_foto}')")
+              sql += ",\n".join(user_vals) + "\nON CONFLICT (id) DO UPDATE SET\n"
+              sql += f"  nama = EXCLUDED.nama, pin = EXCLUDED.pin, role = EXCLUDED.role, sekolah = EXCLUDED.sekolah, tempat_magang = EXCLUDED.tempat_magang, no_hp = EXCLUDED.no_hp, foto_profil = EXCLUDED.foto_profil;\n\n"
+
+          # 3. Tabel Absensi
+          sql += f"-- 3. Tabel Absensi\n"
+          sql += f"CREATE TABLE IF NOT EXISTS absensi (\n"
+          sql += f"  id VARCHAR(50) PRIMARY KEY,\n"
+          sql += f"  student_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,\n"
+          sql += f"  nama_siswa VARCHAR(150) NOT NULL,\n"
+          sql += f"  tanggal DATE NOT NULL,\n"
+          sql += f"  jam_masuk VARCHAR(20) DEFAULT '-',\n"
+          sql += f"  keterangan_masuk TEXT DEFAULT '-',\n"
+          sql += f"  jam_pulang VARCHAR(20) DEFAULT '-',\n"
+          sql += f"  keterangan_pulang TEXT DEFAULT '-',\n"
+          sql += f"  status VARCHAR(20) NOT NULL DEFAULT 'Hadir',\n"
+          sql += f"  latitude NUMERIC(10,8),\n"
+          sql += f"  longitude NUMERIC(11,8),\n"
+          sql += f"  jarak_meters INT DEFAULT 0,\n"
+          sql += f"  status_lokasi VARCHAR(100) DEFAULT 'Di Area Magang',\n"
+          sql += f"  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n"
+          sql += f");\n\n"
 
           if absensi:
-              sql += "-- TABEL ABSENSI\n"
-              sql += "INSERT INTO absensi (id, student_id, nama_siswa, tanggal, jam_masuk, keterangan_masuk, jam_pulang, keterangan_pulang, status, latitude, longitude, jarak_meters, status_lokasi) VALUES\n"
-              vals = []
+              sql += f"-- Insert Data Absensi\n"
+              sql += f"INSERT INTO absensi (id, student_id, nama_siswa, tanggal, jam_masuk, keterangan_masuk, jam_pulang, keterangan_pulang, status, latitude, longitude, jarak_meters, status_lokasi) VALUES\n"
+              att_vals = []
               for a in absensi:
-                  lat = a.get('latitude') or 'NULL'
-                  lng = a.get('longitude') or 'NULL'
-                  jarak = a.get('jarak_meters') or 0
-                  vals.append(f"('{esc(a.get('id'))}', '{esc(a.get('student_id'))}', '{esc(a.get('nama_siswa'))}', '{esc(a.get('tanggal'))}', '{esc(a.get('jam_masuk','-'))}', '{esc(a.get('keterangan_masuk','-'))}', '{esc(a.get('jam_pulang','-'))}', '{esc(a.get('keterangan_pulang','-'))}', '{esc(a.get('status','Hadir'))}', {lat}, {lng}, {jarak}, '{esc(a.get('status_lokasi','Di Area Magang'))}')")
-              sql += ",\n".join(vals) + "\nON CONFLICT (id) DO NOTHING;\n\n"
+                  a_id = esc(a.get("id"))
+                  s_id = esc(a.get("student_id"))
+                  a_nama = esc(a.get("nama_siswa"))
+                  a_tgl = esc(a.get("tanggal", "2026-01-01"))
+                  a_jamm = esc(a.get("jam_masuk", "-"))
+                  a_ketm = esc(a.get("keterangan_masuk", "-"))
+                  a_jamp = esc(a.get("jam_pulang", "-"))
+                  a_ketp = esc(a.get("keterangan_pulang", "-"))
+                  a_status = esc(a.get("status", "Hadir"))
+                  a_lat = a.get("latitude") if a.get("latitude") is not None else "NULL"
+                  a_lng = a.get("longitude") if a.get("longitude") is not None else "NULL"
+                  a_jarak = a.get("jarak_meters", 0) if a.get("jarak_meters") is not None else 0
+                  a_loc = esc(a.get("status_lokasi", "Di Area Magang"))
+                  att_vals.append(f"('{a_id}', '{s_id}', '{a_nama}', '{a_tgl}', '{a_jamm}', '{a_ketm}', '{a_jamp}', '{a_ketp}', '{a_status}', {a_lat}, {a_lng}, {a_jarak}, '{a_loc}')")
+              sql += ",\n".join(att_vals) + "\nON CONFLICT (id) DO UPDATE SET\n"
+              sql += f"  jam_masuk = EXCLUDED.jam_masuk, keterangan_masuk = EXCLUDED.keterangan_masuk, jam_pulang = EXCLUDED.jam_pulang, keterangan_pulang = EXCLUDED.keterangan_pulang, status = EXCLUDED.status, latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude, jarak_meters = EXCLUDED.jarak_meters, status_lokasi = EXCLUDED.status_lokasi;\n\n"
+
+          # 4. Hak Akses Row Level Security (RLS)
+          sql += f"-- 4. Hak Akses Row Level Security (RLS)\n"
+          sql += f"ALTER TABLE users ENABLE ROW LEVEL SECURITY;\n"
+          sql += f"ALTER TABLE absensi ENABLE ROW LEVEL SECURITY;\n"
+          sql += f"ALTER TABLE perusahaan ENABLE ROW LEVEL SECURITY;\n\n"
+          sql += f"DROP POLICY IF EXISTS \"Allow public all on users\" ON users;\n"
+          sql += f"CREATE POLICY \"Allow public all on users\" ON users FOR ALL USING (true) WITH CHECK (true);\n\n"
+          sql += f"DROP POLICY IF EXISTS \"Allow public all on absensi\" ON absensi;\n"
+          sql += f"CREATE POLICY \"Allow public all on absensi\" ON absensi FOR ALL USING (true) WITH CHECK (true);\n\n"
+          sql += f"DROP POLICY IF EXISTS \"Allow public all on perusahaan\" ON perusahaan;\n"
+          sql += f"CREATE POLICY \"Allow public all on perusahaan\" ON perusahaan FOR ALL USING (true) WITH CHECK (true);\n"
 
           with open(filename, "w", encoding="utf-8") as f:
               f.write(sql)
 
-          print(f"📄 SQL backup file created: {filename} ({len(sql)} bytes)")
+          print(f"📄 SQL backup file created successfully: {filename} ({len(sql)} bytes)")
           PYEOF
 
           # ============================================================
           # STEP 5: Kirim Notifikasi + Backup ke Discord
           # ============================================================
-          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
-            echo "⚠️ DISCORD_WEBHOOK_URL belum diisi. Skip kirim ke Discord, tapi keep-alive tetap berhasil."
-            echo "✅ Keep-Alive selesai tanpa notifikasi Discord."
-            exit 0
-          fi
-
           echo "📤 Mengirim notifikasi + backup dengan desain clean ke Discord..."
 
           export PING_STATUS_TEXT EMBED_COLOR DATE_STR TIME_STR ISO_NOW USER_COUNT ABSENSI_COUNT FILENAME STATUS_EMOJI
@@ -221,12 +335,12 @@ jobs:
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -F "files[0]=@${FILENAME}" \
             -F "payload_json=${PAYLOAD_JSON}" \
-            "${DISCORD_WEBHOOK_URL}")
+            "${TARGET_DISCORD}")
 
           echo "Discord webhook response: $HTTP_STATUS"
 
           if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 204 ]; then
-            echo "✅ Notifikasi keep-alive + backup SQL dengan desain baru berhasil dikirim ke Discord!"
+            echo "✅ Notifikasi keep-alive + backup SQL dengan data akurat berhasil dikirim ke Discord!"
           else
             echo "::warning::Discord webhook response: $HTTP_STATUS (keep-alive tetap berhasil, hanya notifikasi gagal)"
           fi

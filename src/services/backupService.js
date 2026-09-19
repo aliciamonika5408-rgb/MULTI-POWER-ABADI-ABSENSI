@@ -248,6 +248,11 @@ export const sendBackupToDiscord = async (customWebhookUrl = null, isScheduled =
     throw new Error(`Gagal mengirim ke Discord (${response.status}): ${errorText}`);
   }
 
+  // Simpan riwayat waktu backup terakhir berhasil dikirim
+  try {
+    localStorage.setItem("last_weekly_backup_timestamp", Date.now().toString());
+  } catch (e) {}
+
   return true;
 };
 
@@ -274,19 +279,15 @@ export const checkAndTriggerWeeklyBackup = async () => {
     const lastBackup = localStorage.getItem("last_weekly_backup_timestamp");
     const now = Date.now();
 
-    // Jika belum pernah diset sama sekali, inisialisasi timestamp sekarang agar tidak spam saat pertama buka
-    if (!lastBackup) {
-      localStorage.setItem("last_weekly_backup_timestamp", now.toString());
-      return false;
-    }
+    // Jika belum pernah diset sama sekali atau sudah lewat >= 7 hari
+    const shouldRunBackup = !lastBackup || (now - Number(lastBackup)) >= SEVEN_DAYS_MS;
 
-    // Jika sudah lewat >= 7 hari
-    if ((now - Number(lastBackup)) >= SEVEN_DAYS_MS) {
+    if (shouldRunBackup) {
       isBackupInProgress = true;
       // Optimistic lock: Segera perbarui timestamp sebelum request jalan agar tidak ter-trigger ganda
       localStorage.setItem("last_weekly_backup_timestamp", now.toString());
 
-      console.log("⏰ Menjalankan auto-backup database 7 harian ke Discord...");
+      console.log("⏰ Menjalankan auto-backup database ke Discord...");
       await sendBackupToDiscord(null, true);
       isBackupInProgress = false;
       return true;

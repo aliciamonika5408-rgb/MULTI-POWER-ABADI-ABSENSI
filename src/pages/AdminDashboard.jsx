@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, CheckCircle, LogIn, LogOut, Eye, X, Calendar, MapPin, FileText } from "lucide-react";
 import { getStudents, getAttendanceRecords } from "../services/db";
+import { checkAndTriggerWeeklyBackup } from "../services/backupService";
 
 export default function AdminDashboard() {
   const [students, setStudents] = useState([]);
@@ -16,6 +17,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
+    checkAndTriggerWeeklyBackup();
     const handleUpdate = () => loadData();
     window.addEventListener("attendance_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
